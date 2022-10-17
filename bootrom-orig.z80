@@ -1,0 +1,3038 @@
+; https://github.com/TheCodeman/Bondwell-12-14
+; z80dasm 1.1.5
+; command line: z80dasm -t -a -g0x7f00 --labels -b bw_block.txt -o bootrom.z80 BOOTROM.BIN
+; build z80asm --list=bootrom-orig.lst  bootrom-orig.z80  -o bootrom-orig.bin
+; disassebled by Ken Segler
+
+ccp_start:		equ	0d400h
+bios_start:		equ 0ea00h
+
+memory_a0_low:	equ 000h 
+memory_a0_high:	equ 001h 
+
+memory_a1_low:	equ 002h 
+memory_a1_high: equ 003h 
+
+prn_init_low: 	equ 006h 
+prn_init_high: 	equ 007h 
+
+caps_lock_off: 	equ 009h
+caps_lock_on:	equ 008h
+
+motor_0_low:  	equ	00ah
+motor_0_high: 	equ 00bh
+
+motor_1_low:  	equ	00ch
+motor_1_high: 	equ 00dh
+
+fdc_tc_low:		equ 00eh
+fdc_tc_high:	equ 00fh 
+
+crtc_add_reg:	equ 010h 
+crtc_data_reg:	equ 011h 
+
+fdc_status_reg: equ 020h 
+fdc_data_reg:	equ 021h 
+
+pia_a_per_reg: 	equ 03ch 
+pia_a_ctrl_reg:	equ 03dh 
+
+pia_b_per_reg: 	equ 03eh 
+pia_b_ctrl_reg:	equ 03fh 
+
+sio_a_data:		equ 040h 
+sio_a_ctrl:		equ 041h 
+sio_b_data:		equ 042h 
+sio_b_ctrl:		equ 043h
+
+dac_port:		equ 050h 
+
+ctc_load_0:		equ 060h 
+ctc_load_1:		equ 061h 
+ctc_load_2:		equ 062h 
+ctc_write_mode:	equ	063h 
+
+sd_data_reg:      equ 080h 
+sd_error_reg:	  equ 081h 
+sd_sector_count:  equ 082h 
+sd_sector_number: equ 083h 
+sd_cylinder_low:  equ 084h 
+sd_cylinder_high: equ 085h 
+sd_sdh:			  equ 086h 
+sd_status_command:equ 087h 
+
+	org	000h
+
+	di			
+	nop			
+	nop			
+	nop			
+	nop			
+	nop			
+	ld hl,08000h ;ram_start_0x8000	
+l7f09h:
+	ld (hl),h	
+	inc hl		
+	ld a,h		
+	or l		
+	jr nz,l7f09h	
+	ld de,00078h	
+l7f12h:
+	ld b,000h		
+l7f14h:
+	djnz l7f14h		
+	dec de			
+	ld a,d			
+	or e			
+	jr nz,l7f12h	
+
+	ld hl,08000h ;ram_start_0x8000	
+l7f1eh:
+	ld a,(hl)		
+	cp h			
+	jr nz,l7f56h	
+	inc hl			
+	ld a,h			
+	or l			
+	jr nz,l7f1eh	
+	ld hl,08000h ;ram_start_0x8000	
+l7f2ah:
+	ld (hl),l		
+	inc hl			
+	ld a,h			
+	or l			
+	jr nz,l7f2ah	
+	ld de,00078h	
+l7f33h:
+	ld b,000h		
+l7f35h:
+	djnz l7f35h		
+	dec de			
+	ld a,d			
+	or e			
+	jr nz,l7f33h	
+	ld hl,08000h ;ram_start_0x8000	
+l7f3fh:
+	;copy code from rom to ram and jump to 0x8000
+	ld a,(hl)	
+	cp l			
+	jr nz,l7f56h	
+	inc hl			
+	ld a,h			
+	or l			
+	jr nz,l7f3fh	
+	ld hl,00100h	
+	ld de,08000h ;ram_start_0x8000	
+	ld bc,0f00h	
+	ldir		
+	jp 08000h ;ram_start_0x8000		
+
+error_beep_flash_led:
+l7f56h:
+	ld c,008h	
+l7f58h:
+	in a,(c)	;caps lock led on
+	ld a,c		
+	xor 001h	
+	ld c,a		
+	ld d,000h	
+l7f60h:
+	ld a,0ffh	
+	out (dac_port),a	
+	ld b,028h		
+l7f66h:
+	djnz l7f66h		
+	xor a			
+	out (dac_port),a	
+	ld b,028h		
+l7f6dh:
+	djnz l7f6dh		
+	dec d			
+	jr nz,l7f60h	
+ 	ld de,00078h	
+	ld b,000h		
+l7f77h:
+	djnz l7f77h		
+	dec de			
+	ld a,d			
+	or e			
+	jr nz,l7f77h	
+	jr l7f58h		
+
+; BLOCK 'copywright' (start 0x7f80 end 0x8000)
+copywright_start:
+	defm "BOOT ROM OF BONDWELL 12/14 COMPUTER,COPYRIGHT (C) 1984 BY BONDWELL INTERNATIONAL LIMITED. NO PART OF THIS ROM MAY BE REPRODUCED."
+
+     
+
+	org 08000h
+ram_start_0x8000:
+	ld sp,l89e2h
+	in a,(memory_a1_low)	
+	in a,(memory_a0_high)	
+	in a,(prn_init_high)	
+	call init_hardware_clear_screen	;and run test
+	xor a			
+	ld (00004h),a	
+	ld hl,init_io_data_start	
+	call init_io_ports_start
+	in a,(fdc_tc_low)		
+	xor a			
+	ld (l888eh),a	
+	ld (l888fh),a	
+	call read_sector ;sub_8233h	
+	or a			
+	jp nz,l80d8h	
+	ld hl,l88a2h	
+	ld de,cpm3idsector_start	
+l802ch:
+	ld a,(de)	
+	or a		
+	jr z,l8038h	
+	cp (hl)		
+	jp nz,boot_from_floppy	
+	inc de			
+	inc hl			
+	djnz l802ch		
+l8038h:
+	ld hl,00100h	
+	ld (l888fh+1),hl	
+	ld a,001h		
+	ld (l888fh),a	
+	ld b,023h		
+l8045h:
+	push bc			
+	call read_sector ;sub_8233h	
+	or a			
+	jp nz,l80d8h	
+	ld hl,l88a2h	
+	ld de,(copy_dest) ;l8890h 
+	ld bc,00100h	
+	ldir		
+	ld hl,(copy_dest) ;l8890h
+	ld de,00100h	
+	add hl,de		
+	ld (copy_dest),hl ;l8890h
+	ld a,(l888fh)	
+	inc a			
+	cp 012h		
+	jr nz,l8077h
+	ld hl,09000h
+	ld (copy_dest),hl ;l8890h
+	ld a,001h		
+	ld (l888eh),a	
+	xor a			
+l8077h:
+	ld (l888fh),a	
+	pop bc			
+	djnz l8045h		
+	in a,(motor_0_low)		;motor 0 low
+	in a,(motor_1_low)		;motor 1 low
+	jp 00100h		
+
+; BLOCK 'cpm3idsector' (start 0x8084 end 0x80be)
+cpm3idsector_start:
+	defm "CP/M 3.0 ID SECTOR, CUSTOMIZED BY SIMON CHENG, APRIL 1984",0
+;
+;
+;
+boot_from_floppy:
+	ld hl,0da00h	
+	ld (copy_dest),hl	;l8890h
+	ld a,001h		
+	ld (l888eh),a	
+	ld a,004h		
+	ld (l888fh),a	
+	ld bc,0000eh	
+l80d1h:
+	push bc			
+	call read_sector ;sub_8233h	
+	or a			
+	jr z,copy_areas	
+l80d8h:
+	ld hl,diskerror_loc_start	
+	call print_string_start		
+	in a,(motor_0_low)			;motor 0 low
+	in a,(motor_1_low)			;motor 1 low
+	jp press_key_text_end
+
+; BLOCK 'diskerror_loc' (start 0x80e5 end 0x80e7)
+diskerror_loc_start:
+	defw 0ff80h		
+
+; BLOCK 'diskerror' (start 0x80e7 end 0x80fd)
+diskerror_start:
+	defm "DISK LOADING ERROR !!",0
+
+copy_areas:
+	ld hl,l88a2h		;sector buffer
+	ld de,(copy_dest)	;da00 ;l8890h
+	ld bc,00100h		;256 bytes
+	ldir		
+	ld hl,(copy_dest)	;l8890h
+	ld de,00100h	
+	add hl,de		
+	ld (copy_dest),hl	;l8890h
+	ld a,(l888fh)	
+	inc a			
+	ld (l888fh),a	
+	pop bc			
+	dec c			
+	jr nz,l80d1h	
+	in a,(motor_0_low)	;motor 0 low
+	in a,(motor_1_low)	;motor 1 low
+	ld a,(0da02h)	
+	add a,00eh		
+	ld hl,0e800h	
+	ld d,a			
+	ld e,000h		
+	dec hl			
+	dec de			
+	ld bc,00e00h	
+	lddr		
+	ld a,(0da02h)	
+	ld h,a			
+	ld l,000h		
+	jp (hl)			
+	
+specify_drive: 	;sub_813bh:
+;specify 
+	call fdc_wait_busy		
+	ld hl,specify_command
+	ld de,l8892h		
+	ld bc,00003h		
+	ldir		
+	ld c,003h	
+	call fdc_write_cmd_packet
+	ret		
+
+
+recalibrate_drive:  ;sub_814fh:
+	ld a,003h	
+	ld (l8193h),a	
+l8154h:
+	call fdc_wait_busy	
+	call get_drive_sense_status		
+	ld a,(l889bh)		
+	and 020h		
+	jr z,l8154h		
+	call fdc_wait_busy	
+	ld hl,recalibrate_command
+	ld de,l8892h	
+	ld bc,00002h	
+	ldir		
+	ld a,(l888dh)	
+	inc a			
+	ld (l8893h),a	
+	ld c,002h		
+	call fdc_write_cmd_packet	
+	call fdc_check_int ;sub_82f8h	
+	call get_drive_interrupt_status
+	ld a,(l889bh)	
+	and 0f0h		
+	cp 020h		
+	ret z		
+	ld a,(l8193h)	
+	dec a			
+	ld (l8193h),a	
+	jr nz,l8154h	
+	ret			
+l8193h:
+	defb 09dh
+
+;
+;Enable drive motors 
+;if l888dh == 0 motor_1 else motor_0
+;
+enable_drive_motor:
+	ld a,(l888dh)	
+	or a			
+	jr z,l81a0h		
+	ld b,00dh		
+	ld c,00ah		
+	jr l81a4h		
+l81a0h:
+	ld b,00bh		
+	ld c,00ch		
+l81a4h:
+	in a,(pia_a_per_reg)		
+	out (c),a		
+	ld c,b			
+	out (c),a		
+	and 008h		
+	ret nz			
+	ld de,004b0h	
+	jp delay	
+
+;seek drive
+seek_drive: ;l81b4h:
+	call fdc_wait_busy	
+	ld hl,seek_command		
+	ld de,l8892h		
+	ld bc,00003h		
+	ldir		
+	ld hl,l888dh		 
+	ld a,(l888eh)		 
+	cp 028h				
+	jr nc,l81d2h		
+	ld (l888ch),a		 
+	xor a				
+	jr l81d9h			
+l81d2h:
+	sub 028h			
+	ld (l888ch),a		 
+	ld a,004h			
+l81d9h:
+	or (hl)				
+	inc a				
+	ld (l888bh),a		 
+	ld (l8893h),a		 
+	ld a,(l888ch)		 
+	ld (l8894h),a		 
+	ld c,003h			
+	call fdc_write_cmd_packet		 
+	call fdc_check_int ;sub_82f8h		 
+	call get_drive_interrupt_status		 
+	ld a,(l889bh)		 
+	and 020h			
+	jr z,seek_drive ;l81b4h			
+	ret				
+
+
+get_drive_interrupt_status:
+	call fdc_wait_busy	 
+	ld hl,sense_interrupt_status		 
+	ld de,l8892h		 
+	ld bc,00001h		 
+	ldir				
+	ld c,001h			
+	call fdc_write_cmd_packet		 
+	ld c,002h		;number of bytes	
+	call fdc_read_data_to_memory ;sub_82c6h		 
+	ret					
+get_drive_sense_status:
+	call fdc_wait_busy		
+	ld hl,sense_drive_status		
+	ld de,l8892h			
+	ld bc,00002h			
+	ldir					
+	ld a,(l888dh)			
+	inc a					
+	ld (l8893h),a			
+	ld c,002h				
+	call fdc_write_cmd_packet			
+	ld c,001h						;number of bytes		
+	call fdc_read_data_to_memory ;sub_82c6h			
+	ret	
+
+read_sector_sd:
+
+;sub_8233h:
+read_sector:
+	call enable_drive_motor ;sub_8194h set motor_? and seek drive 		
+	call seek_drive ;l81b4h					
+	call fdc_wait_busy			
+	ld hl,fdc_read_data_start	;get read command bytes
+	ld de,l8892h	;0x66			
+	ld bc,00009h				
+	ldir			;copy (de),(hl) 9 bytes			
+	ld a,(l888bh)	;cylinder number			
+	ld (l8893h),a	;save cylinder			
+	srl a						
+	srl a						
+	ld (l8895h),a	;save sector				
+	ld a,(l888ch)	;head			
+	ld (l8894h),a	;save head			
+	ld a,(l888fh)	;bytes			
+	ld (l8896h),a	;number of bytes		
+	ld e,00ah					
+l8262h:
+	ld b,000h					
+	ld c,009h					
+	call fdc_write_cmd_packet	;write data to fdc		
+	ld hl,l88a2h				
+l826ch:
+	in a,(pia_a_per_reg)		;check fdc int				
+	rla							
+	jr nc,l826ch				
+	jr l8297h					
+l8273h:
+	in a,(pia_a_per_reg)					
+	rla							
+	jr c,l8297h					
+	in a,(pia_a_per_reg)					
+	rla							
+	jr c,l8297h					
+	in a,(pia_a_per_reg)					
+	rla							
+	jr c,l8297h					
+	in a,(pia_a_per_reg)					
+	rla							
+	jr c,l8297h					
+	in a,(pia_a_per_reg)					
+	rla							
+	jr c,l8297h					
+	ld c,006h			;number of bytes		
+	call fdc_read_data_to_memory ;sub_82c6h				
+l8291h:
+	dec e						
+	jr nz,l8262h				
+	ld a,001h					
+	ret			
+
+
+
+l8297h:
+	in a,(fdc_data_reg)			
+	ld (hl),a			
+	inc hl				
+	djnz l8273h			
+	call fdc_toggle_tc ;sub_82e6h		
+	call fdc_check_int ;sub_82f8h		
+	ld c,007h			;number of bytes
+	call fdc_read_data_to_memory ;sub_82c6h		
+	ld a,(l889bh)		
+	and 0c0h			
+	jr nz,l8291h		
+	ret					
+fdc_write_cmd_packet:
+	ld hl,l8892h		
+l82b3h:
+	call small_delay	
+	in a,(fdc_status_reg) 	;fdc status register
+	and 0c0h			
+	cp 080h			;check for RQM 	
+	jr nz,l82b3h	;keep checking	
+	ld a,(hl)			
+	out (fdc_data_reg),a 	;fdc write data register		
+	inc hl				
+	dec c				
+	jr nz,l82b3h		
+	ret				
+
+;
+; Read data from fdc and store in (hl) count in c		
+fdc_read_data_to_memory:
+;sub_82c6h:
+	ld hl,l889bh		
+l82c9h:
+	call small_delay	 
+	in a,(fdc_status_reg) 	;fdc status register			
+	and 0c0h			
+	cp 0c0h					;DIO = 1 & RQM = 1	
+	jr nz,l82c9h		
+	in a,(fdc_data_reg)		;fdc read data register	
+	ld (hl),a			
+	inc hl				
+	dec c				
+	jr nz,l82c9h		
+	ret					
+
+
+delay:
+	ld b,000h		
+l82deh:
+	djnz l82deh		
+	dec de			
+	ld a,d			
+	or e			
+	jr nz,delay		
+	ret				
+fdc_toggle_tc:
+;sub_82e6h:
+	in a,(fdc_tc_high)		;toggle fdc tc 		
+	call small_delay		
+	in a,(fdc_tc_low)				
+	ret						
+;fdc_wait_busy
+fdc_wait_busy:
+	call small_delay		
+	in a,(fdc_status_reg) 	;fdc status register				
+	and 030h				
+	jr nz,fdc_wait_busy		
+	ret	
+fdc_check_int:					
+;sub_82f8h:
+	in a,(pia_a_per_reg)		;check fdc int from pia		
+	rla				;rotate bit7 to carry		
+	jr nc,fdc_check_int ;sub_82f8h			
+	ret				
+
+
+small_delay:
+	ex (sp),ix				
+	ex (sp),ix				
+	ex (sp),ix				
+	ex (sp),ix				
+	ret						
+
+; BLOCK 'init_io_ports' (start 0x8307 end 0x8312)
+init_io_ports_start:
+	ld a,(hl)			;init_io_data_start
+	or a				
+	ret z				
+	ld b,a				;count
+	inc hl				
+	ld c,(hl)			;port
+	inc hl				;data
+	otir				
+	jr init_io_ports_start		
+init_io_ports_end:
+
+; BLOCK 'init_io_data' (start 0x8312 end 0x83a4)
+init_io_data_start:
+	;count 
+	;port
+	;data
+
+	defb 001h		
+	defb 03dh		;pia
+	defb 03ah		
+
+	defb 001h		
+	defb 03ch		;pia
+	defb 000h		
+	
+	defb 001h		
+	defb 03dh		;pia
+	defb 03eh		
+	
+	defb 001h		
+	defb 03fh		;pia
+	defb 038h		
+	
+	defb 001h		
+	defb 03eh		;pia
+	defb 0ffh		
+	
+	defb 001h		
+	defb 03fh		;pia
+	defb 03ch		
+	
+	defb 009h		
+	defb 041h		;sio
+	defb 000h		
+	defb 001h		
+	defb 000h		
+	defb 003h		
+	defb 041h		
+	defb 004h		
+	defb 047h		
+	defb 005h		
+	defb 028h		
+
+	defb 009h		
+	defb 043h		;sio
+	defb 000h		
+	defb 001h		
+	defb 000h		
+	defb 003h		
+	defb 0c1h		
+	defb 004h		
+	defb 044h		
+	defb 005h		
+	defb 068h	
+
+	defb 001h		
+	defb 063h		;ctc
+	defb 036h		
+
+	defb 002h		
+	defb 060h		;ctc
+	defb 080h		
+	defb 001h	
+
+	defb 001h		
+	defb 063h		;ctc
+	defb 076h	
+
+	defb 002h		
+	defb 061h		;ctc
+	defb 080h		
+	defb 001h		
+	
+	defb 001h		
+	defb 063h		;ctc
+	defb 0b0h		
+	
+	defb 002h		
+	defb 062h		;ctc
+	defb 010h		
+	defb 000h		
+	;init crtc controller
+	defb 001h		
+	defb 010h		;crtc 
+	defb 000h		;R0
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 070h		;
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 001h		;R1
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 050h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 002h		;R2
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 05ch		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 003h		;R3
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 009h		;
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 004h		;R4
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 01dh		;
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 005h		;R5
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 001h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 006h		;R6
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 019h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 007h		;R7
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 01ah		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 008h		;R8
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 000h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 009h		;R9
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 008h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 00ah		;R10
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 040h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 00bh		;R11
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 008h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 00ch		;R12
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 000h		
+	
+	defb 001h		
+	defb 010h		;crtc
+	defb 00dh		;R13
+	
+	defb 001h		
+	defb 011h		;crtc
+	defb 000h		
+	defb 000h		
+init_io_data_end:
+
+
+init_hardware_clear_screen:
+	ld hl,init_io_ports_end		
+	call init_io_ports_start	
+	ld hl,0f800h		
+l83adh:
+	ld (hl),000h		
+	inc hl			
+	ld a,h			
+	or l			
+	jr nz,l83adh	
+	ld hl,bwdiagloc_start	
+	call print_string_start	
+	ld hl,system_loc_start		
+	call print_string_start	
+	ld hl,system_2loc_start	
+	call print_string_start	
+	jr start_test	
+
+; BLOCK 'bwdiagloc' (start 0x83c8 end 0x83ca)
+bwdiagloc_start:
+	defw 0f80ah		
+
+; BLOCK 'bwdiag' (start 0x83ca end 0x83fb)
+bwdiag_start:
+	defm "BONDWELL 12/14  (BONDWELL INTERNATIONAL LIMITED)", 0
+
+; BLOCK 'system_loc' (start 0x83fb end 0x83fd)
+system_loc_start:
+	defw 0f8b1h		
+
+; BLOCK 'system_text' (start 0x83fd end 0x841f)
+system_text_start:
+	defm "<<< SYSTEM DIAGNOSTIC PROGRAM >>>",0
+
+; BLOCK 'system_2loc' (start 0x841f end 0x8421)
+system_2loc_start:
+	defw 0f901h		
+
+; BLOCK 'system_2text' (start 0x8421 end 0x8443)
+system_2text_start:
+	defm "---------------------------------",0
+;
+;
+;
+;
+;
+start_test:
+	in a,(memory_a1_high)		
+	in a,(memory_a0_low)		
+	ld a,055h		
+	ld (00000h),a	
+	ld de,00078h	
+	call delay		
+	ld a,(00000h)	
+	cp 055h		
+	jr nz,l8470h
+	ld a,0aah	
+	ld (00000h),a		
+	ld de,00078h		
+	call delay		
+	ld a,(00000h)	
+	cp 0aah		
+	jr nz,l8470h
+	ld a,001h	
+	ld (ram128k_text_end),a		
+
+
+l8470h:
+	in a,(memory_a1_low)	
+	in a,(memory_a0_high)	
+	call sub_8525h	
+	ld d,000h		
+	call sub_8560h	
+	ld a,(ram128k_text_end)		
+	or a			
+	jr z,l849ah		
+	in a,(memory_a1_high)		
+	in a,(memory_a0_low)		
+	call sub_8525h	
+	ld d,001h		
+	call sub_8560h	
+	in a,(memory_a1_high)		
+	in a,(memory_a0_high)		
+	call sub_8525h	
+	ld d,002h		
+	call sub_8560h	
+
+l849ah:
+	in a,(memory_a1_low)		
+	in a,(memory_a0_high)		
+	ld d,000h		
+	call sub_856bh	
+	ld a,(ram128k_text_end)		
+	or a			
+	jr z,l84bbh		
+	in a,(memory_a1_high)		
+	in a,(memory_a0_low)		
+	ld d,001h		
+	call sub_856bh	
+	in a,(memory_a1_high)		
+	in a,(memory_a0_high)		
+	ld d,002h		
+	call sub_856bh	
+l84bbh:
+	ld a,(ram128k_text_end)		
+	or a			
+	jr z,l84c6h		
+	ld hl,ram64k_text_end	
+	jr l84c9h		
+l84c6h:
+	ld hl,ram64k_loc_start	
+l84c9h:
+	call print_string_start	
+	in a,(memory_a1_low)		
+	in a,(memory_a0_high)		
+	jp crt_test		
+
+; BLOCK 'ram64k_loc' (start 0x84d3 end 0x84d5)
+ram64k_loc_start:
+	defw 0fa80h		
+ram64k_loc_end:
+
+; BLOCK 'ram64k_text' (start 0x84d5 end 0x84fb)
+ram64k_text_start:
+	defm "*** 64K RAM IS INSTALLED ON BOARD ***",0
+ram64k_text_end:
+
+; BLOCK 'ram128k_loc' (start 0x84fb end 0x84fd)
+ram128k_loc_start:
+	defw 0fa80h		
+ram128k_loc_end:
+
+; BLOCK 'ram128k_text' (start 0x84fd end 0x8524)
+ram128k_text_start:
+	defm "*** 128K RAM IS INSTALLED ON BOARD ***",0
+ram128k_text_end:
+	nop	
+verify_ram:			
+sub_8525h:
+	ld hl,00000h	
+l8528h:
+	ld (hl),h		
+	inc hl				
+	ld a,h				
+	cp 080h				
+	jr nz,l8528h		
+	ld de,00078h		
+	call delay			
+	ld hl,00000h		
+l8538h:
+	ld a,(hl)			
+	cp h				
+	jr nz,l8579h		
+	inc hl				
+	ld a,h				
+	cp 080h				
+	jr nz,l8538h		
+	ld hl,00000h		
+l8545h:
+	ld (hl),l			
+	inc hl				
+	ld a,h				
+	cp 080h				
+	jr nz,l8545h		
+	ld de,00078h		
+	call delay			
+	ld hl,00000h		
+l8555h:
+	ld a,(hl)			
+	cp l				
+	jr nz,l8579h		
+	inc hl				
+	ld a,h				
+	cp 080h				
+	jr nz,l8555h		
+	ret					
+sub_8560h:
+	ld hl,00000h		
+l8563h:
+	ld (hl),d			
+	inc hl				
+	ld a,h				
+	cp 080h				
+	jr nz,l8563h		
+	ret					
+sub_856bh:
+	ld hl,00000h		
+l856eh:
+	ld a,(hl)			
+	cp d				
+	jr nz,l8579h		
+	inc hl				
+	ld a,h				
+	cp 080h				
+	jr nz,l856eh		
+	ret					
+l8579h:
+	ld hl,ram_test_failed_loc_start		
+	call print_string_start		
+	xor a			
+	ld (l888ah),a		
+	jr crt_test		
+
+; BLOCK 'ram_test_failed_loc' (start 0x8585 end 0x8587)
+ram_test_failed_loc_start:
+	defw 0fb20h		
+
+; BLOCK 'ram_test_failed_text' (start 0x8587 end 0x8598)
+ram_test_failed_text_start:
+	defm "RAM TEST -- FAIL",0
+
+;crt test write 0x55 to cursor high read back and 0xaa to cursor high and read back
+crt_test:
+	ld a,00eh			;cursor high	
+	out (crtc_add_reg),a		
+	ld a,010h			
+	out (crtc_data_reg),a
+
+	ld a,00fh			;cursosr low
+	out (crtc_add_reg),a		
+	ld a,055h			
+	out (crtc_data_reg),a		
+
+	ld a,00fh			
+	out (crtc_add_reg),a		
+	in a,(crtc_data_reg)			
+	cp 055h				
+	jr nz,l85c7h		
+	
+	ld a,00fh			
+	out (crtc_add_reg),a		
+	ld a,0aah			
+	out (crtc_data_reg),a		
+	ld a,00fh			
+	out (crtc_add_reg),a		
+	in a,(crtc_data_reg)			
+	cp 0aah				
+	jr nz,l85c7h		
+	jp pia_test		
+l85c7h:
+	ld hl,crt_test_failed_loc_start		
+	call print_string_start				
+	xor a								
+	ld (l888ah),a						
+	jr crt_test_failed_text_end			
+
+; BLOCK 'crt_test_failed_loc' (start 0x85d3 end 0x85d5)
+crt_test_failed_loc_start:
+	defw 0fb70h		
+crt_test_failed_loc_end:
+
+; BLOCK 'crt_test_failed_text' (start 0x85d5 end 0x85e9)
+crt_test_failed_text_start:
+	defm "CRT TEST -- FAIL !!",0
+crt_test_failed_text_end:
+
+pia_test:
+	in a,(pia_a_ctrl_reg)		
+	and 03fh		
+	ld b,a			
+	xor 004h		
+	ld c,a			
+	out (pia_a_ctrl_reg),a	
+	in a,(pia_a_ctrl_reg)		
+	and 03fh		
+	cp c			
+	jr nz,l8608h	
+	xor 004h		
+	out (pia_a_ctrl_reg),a	
+	in a,(pia_a_ctrl_reg)		
+	and 03fh		
+	cp b			
+	jr nz,l8608h	
+	jp pia_test_failed_text_end		
+l8608h:
+	ld hl,pia_test_failed_loc_start	
+	call print_string_start		
+	xor a			
+	ld (l888ah),a	
+	jr pit_test
+
+; BLOCK 'pia_test_failed_loc' (start 0x8614 end 0x8616)
+pia_test_failed_loc_start:
+	defw 0fbc0h		
+pia_test_failed_loc_end:
+
+; BLOCK 'pia_test_failed_text' (start 0x8616 end 0x862a)
+pia_test_failed_text_start:
+	defm "PIA TEST -- FAIL !!",0
+pia_test_failed_text_end:
+
+pit_test:
+	ld a,0b6h		
+	out (ctc_write_mode),a	
+	ld a,080h		
+	out (ctc_load_2),a	
+	ld a,001h		
+	out (ctc_load_2),a	
+	ld bc,00000h	
+	ld de,00000h	
+	ld h,000h		
+l863eh:
+	in a,(pia_a_per_reg)		
+	and 010h		
+	cp h			
+	jr nz,l866dh	
+	dec bc			
+	ld a,b			
+	or c			
+	jr nz,l863eh	
+	ld hl,(l8669h)	
+	ld bc,(l8669h+2)
+	ld a,d			
+	cp h			
+	jr c,l8671h		
+	jr nz,l865bh	
+	ld a,e			
+	cp l			
+	jr c,l8671h		
+l865bh:
+	ld a,b			
+	cp d			
+	jr c,l8671h		
+	jp nz,pit_test_failed_text_end	
+	ld a,c			
+	cp e			
+	jr c,l8671h		
+	jp sio_test
+l8669h:
+	defb			0fah
+	defb			026h
+	defb			022h
+	defb			027h
+l866dh:
+	ld h,a			
+	inc de			
+	jr l863eh		
+l8671h:
+	ld hl,pit_test_failed_loc_start		
+	call print_string_start		
+	xor a			
+	ld (l888ah),a	
+	jr pit_test_failed_text_end	
+
+; BLOCK 'pit_test_failed_loc' (start 0x867d end 0x867f)
+pit_test_failed_loc_start:
+	defw 0fc10h		
+pit_test_failed_loc_end:
+
+; BLOCK 'pit_test_failed_text' (start 0x867f end 0x8693)
+pit_test_failed_text_start:
+	defm "PIT TEST -- FAIL !!",0
+pit_test_failed_text_end:
+
+sio_test:
+	in a,(sio_a_ctrl)		
+	and 004h		
+	jr nz,l86a5h	
+	ld de,00078h	
+	call delay		
+	in a,(sio_a_ctrl)		
+	and 004h		
+	jr z,l86beh		
+l86a5h:
+	out (sio_a_data),a	
+	out (sio_a_data),a	
+	in a,(sio_a_ctrl)		
+	and 004h		
+	jr nz,l86beh	
+	ld de,00078h	
+	call delay		
+	in a,(sio_a_ctrl)		
+	and 004h		
+	jr z,l86beh		
+	jp fdc_test
+l86beh:
+	ld hl,sio_test_failed_loc_start	
+	call print_string_start		
+	xor a			
+	ld (l888ah),a
+	jr fdc_test	
+
+; BLOCK 'sio_test_failed_loc' (start 0x86ca end 0x86cc)
+sio_test_failed_loc_start:
+	defw 0fc60h		
+
+
+; BLOCK 'sio_test_failed_text' (start 0x86cc end 0x86e0)
+sio_test_failed_text_start:
+	defm "SIO TEST -- FAIL !!",0
+
+
+fdc_test:
+	in a,(fdc_status_reg) ;fdc status register		
+	and 0c0h		
+	cp 080h		
+	jr nz,l8708h		
+	call small_delay	
+	xor a			
+	out (fdc_data_reg),a ;fdc write data register	
+	ld de,00078h	
+	call delay		
+	in a,(fdc_status_reg) ;fdc status register		
+	and 0c0h		
+	cp 0c0h		
+	jr nz,l8708h	
+	call small_delay	
+	in a,(fdc_data_reg)		
+	cp 080h		
+	jr nz,l8708h
+	jp drive_b_test		
+l8708h:
+	ld hl,fdc_test_failed_loc_start	
+	call print_string_start		
+	xor a			
+	ld (l888ah),a	
+	jr drive_b_test	
+
+; BLOCK 'fdc_test_failed_loc' (start 0x8714 end 0x8716)
+fdc_test_failed_loc_start:
+	defw 0fcb0h		
+
+
+; BLOCK 'fdc_test_failed_text' (start 0x8716 end 0x872a)
+fdc_test_failed_text_start:
+	defm "FDC TEST -- FAIL !!",0
+
+
+drive_b_test:
+	in a,(fdc_tc_low)		
+	in a,(motor_0_high)			;motor 0 high
+	in a,(motor_1_high)			;motor 1 high
+	ld de,004b2h	
+	call delay		
+	call specify_drive 			;sub_813bh	
+	ld a,00ah		
+	ld (l888eh),a	
+	ld a,001h		
+	ld (l888dh),a			;select drive b
+	call recalibrate_drive ;sub_814fh	
+	cp 020h		
+	jr z,drive_a_test		
+	ld hl,drive_b_failed_loc_start		
+	call print_string_start		
+	xor a			
+	ld (l888ah),a	
+	jr l8776h		
+
+; BLOCK 'drive_b_failed_loc' (start 0x8756 end 0x8758)
+drive_b_failed_loc_start:
+	defw 0fd00h		
+
+
+; BLOCK 'drive_b_failed_text' (start 0x8758 end 0x8770)
+drive_b_failed_text_start:
+	defm "DRIVE B TEST -- FAIL !!",0
+
+
+drive_a_test:
+	call seek_drive 		;l81b4h		
+	call recalibrate_drive	;sub_814fh	
+l8776h:
+	xor a			
+	ld (l888dh),a			;select drive a
+	call recalibrate_drive  ;sub_814fh	
+	cp 020h		
+	jr z,test_complete		
+	ld hl,drive_a_failed_loc_start		
+	call print_string_start		
+	xor a			
+	ld (l888ah),a	
+	jr l87adh		
+
+; BLOCK 'drive_a_failed_loc' (start 0x878d end 0x878f)
+drive_a_failed_loc_start:
+	defw 0fd50h
+
+; BLOCK 'drive_a_failed_text' (start 0x878f end 0x87a7)
+drive_a_failed_text_start:
+	defm "DRIVE A TEST -- FAIL !!",0
+
+test_complete:
+	call seek_drive ;l81b4h		
+	call recalibrate_drive	;sub_814fh	
+l87adh:
+	in a,(motor_0_low)		;motor 0 low
+	in a,(motor_1_low)		;motor 1 low
+	call sub_884ch	
+	ld a,(l888ah)	
+	or a			
+	jr z,press_key_text_end	
+	ld hl,pass_all_loc_start	
+	call print_string_start		
+	jr all_test_pased		
+; BLOCK 'pass_all_loc' (start 0x87c2 end 0x87c4)
+pass_all_loc_start:
+	defw 0fb20h		
+; BLOCK 'pass_all_text' (start 0x87c4 end 0x87e7)
+pass_all_text_start:
+	defm "FUNCTION COMPLETED, PASS ALL TESTS",0
+
+all_test_pased:
+	ld	hl, 087feh
+	call	08861h
+	in a,(pia_b_per_reg)		
+check_keyboard:
+	in a,(pia_b_ctrl_reg)		
+	and 080h		
+;change jr z to nop to skip press key to boot
+	;nop			
+	;nop			
+	jr z,check_keyboard
+	in a,(pia_b_per_reg)		
+	ld a,(ram128k_text_end)		
+	ld (00040h),a		
+	ret			
+
+; BLOCK 'press_key_loc' (start 0x87fe end 0x8800)
+press_key_loc_start:
+	defw 0ff30h	
+press_key_loc_end:
+; BLOCK 'press_key_text' (start 0x8800 end 0x882a)
+press_key_text_start:
+	defm "PRESS ANY KEY TO LOAD SYSTEM FROM DRIVE A",0
+press_key_text_end:
+
+	in a,(pia_b_per_reg)		
+	ld c,008h		
+l882eh:
+	in a,(c)		
+	ld a,c			
+	xor 001h		
+	ld c,a			
+	push bc			
+	call sub_884ch	
+	ld de,00168h	
+	call delay		
+	pop bc			
+	in a,(pia_b_ctrl_reg)		
+	and 080h		
+	jr z,l882eh		
+	in a,(pia_b_per_reg)		
+	in a,(memory_a1_low)		
+	in a,(memory_a0_high)		
+	ret			
+sub_884ch:
+	ld c,000h		
+l884eh:
+	ld a,080h		
+	out (dac_port),a	
+	ld b,028h		
+l8854h:
+	djnz l8854h		
+	xor a			
+	out (dac_port),a	
+	ld b,028h		
+l885bh:
+	djnz l885bh		
+	dec c			
+	jr nz,l884eh	
+	ret			
+
+
+; BLOCK 'print_string' (start 0x8861 end 0x886d)
+print_string_start:	ld e,(hl)		
+	inc hl			
+	ld d,(hl)		
+	inc hl			
+l8865h:
+	ld a,(hl)		
+	or a			
+	ret z			
+	ld (de),a		
+	inc hl			
+	inc de			
+	jr l8865h		 
+
+specify_command:
+	defb 003h		
+	defb 0d7h		
+	defb 003h
+recalibrate_command:
+	defb 007h		
+	defb 001h
+seek_command:
+	defb 00fh
+	defb 001h
+	defb 000h
+sense_interrupt_status:
+	defb 008h		
+; BLOCK 'fdc_read_data' (start 0x8876 end 0x8888)
+fdc_read_data_start:
+	defb 046h		;read data command
+	defb 001h		;c
+	defb 000h		;h
+	defb 000h		;s
+	defb 001h		;n
+	defb 001h		;eot
+	defb 012h		;gpl
+	defb 00ah		;dtl
+	defb 0ffh		
+
+fdc_write_data_start:
+	defb 045h		;write data command
+	defb 001h		;c
+	defb 000h		;h
+	defb 000h		;s
+	defb 001h		;n
+	defb 001h		;eot
+	defb 012h		;gpl
+	defb 00ah		;dtl
+	defb 0ffh		
+fdc_read_data_end:
+sense_drive_status:
+	defb 004h
+	defb 001h
+l888ah:
+	defb 001h
+l888bh:
+	defb 000h
+l888ch:
+	defb 000h
+l888dh:
+	defb 066h
+l888eh:
+	defb 033h
+l888fh:
+	defb	03eh
+copy_dest:
+;l8890h:
+	defb	030h
+	defb	0cdh
+l8892h:
+	defb	066h
+l8893h:
+	defb 033h		
+l8894h:
+	defb 079h		
+l8895h:
+	defb 0e5h		
+l8896h:
+	defb 02ah		
+	defb 07bh		
+	defb 033h		
+	defb 077h		
+	defb 02bh		
+l889bh:
+	defb 022h		
+	defb 07bh		
+	defb 033h		
+	defb 0e1h		
+	defb 0c9h		
+	defb 0c1h		
+	defb 0cdh	
+	
+l88a2h:
+	defb 036h		
+	defb 00bh		
+	defb 02ah		
+	defb 07bh		
+	defb 033h		
+	defb 0c3h		
+	defb 0cdh		
+	defb 032h		
+	defb 000h		
+	defb 000h		
+	defb 04fh		
+	defb 077h		
+	defb 02bh		
+	defb 0cdh		
+	defb 0eah		
+	defb 00ah		
+	defb 0b9h		
+	defb 0cah		
+	defb 08fh		
+	defb 033h		
+	defb 0feh		
+	defb 00dh		
+	defb 0cah		
+	defb 0d2h		
+	defb 033h		
+	defb 0c3h		
+	defb 07eh		
+	defb 033h		
+	defb 077h		
+	defb 02bh		
+	defb 0cdh		
+	defb 0eah		
+	defb 00ah		
+	defb 0b9h		
+	defb 0cah		
+	defb 07eh		
+	defb 033h		
+	defb 0c3h		
+	defb 094h		
+	defb 032h		
+	defb 004h		
+	defb 005h		
+	defb 0cah		
+	defb 0a2h		
+	defb 033h		
+	defb 077h		
+	defb 02bh		
+	defb 004h		
+	defb 0c3h		
+	defb 0cdh		
+	defb 032h		
+	defb 005h		
+	defb 0cah		
+	defb 0cdh		
+	defb 032h		
+	defb 0fah		
+	defb 0b5h		
+	defb 033h		
+	defb 0c3h		
+	defb 0cbh		
+	defb 032h		
+	defb 004h		
+	defb 005h		
+	defb 0c2h		
+	defb 0cbh		
+	defb 032h		
+	defb 0d1h		
+	defb 07bh		
+	defb 095h		
+	defb 03dh		
+	defb 012h		
+	defb 0c1h		
+	defb 0ebh		
+	defb 02ah		
+	defb 046h		
+	defb 03dh		
+	defb 02bh		
+	defb 07eh		
+	defb 0feh		
+	defb 020h		
+	defb 0cch		
+	defb 036h		
+	defb 00bh		
+	defb 0feh		
+	defb 009h		
+	defb 0cch		
+	defb 036h		
+	defb 00bh		
+	defb 0ebh		
+	defb 0c9h		
+	defb 004h		
+	defb 005h		
+	defb 0cah		
+	defb 0b5h		
+	defb 033h		
+	defb 0cdh		
+	defb 0e5h		
+	defb 004h		
+	defb 0c3h		
+	defb 0b5h		
+	defb 033h		
+	defb 0f5h		
+	defb 0e5h		
+	defb 021h		
+	defb 0cah		
+	defb 03dh		
+	defb 0cdh		
+	defb 08dh		
+	defb 00dh		
+	defb 0d2h		
+	defb 0ebh		
+	defb 033h		
+	defb 023h		
+	defb 036h		
+	defb 00dh		
+	defb 02bh		
+	defb 0ebh		
+	defb 0e1h		
+	defb 0f1h		
+	defb 0c9h		
+	defb 0e1h		
+	defb 0f1h		
+	defb 012h		
+	defb 013h		
+	defb 0c9h		
+	defb 0cdh		
+	defb 03eh		
+	defb 031h		
+	defb 0feh		
+	defb 026h		
+	defb 0cah		
+	defb 0f0h		
+	defb 033h		
+	defb 0feh		
+	defb 03ah		
+	defb 0cah		
+	defb 03eh		
+	defb 031h		
+	defb 0feh		
+	defb 021h		
+	defb 0d0h		
+	defb 0feh		
+	defb 00dh		
+	defb 0c8h		
+	defb 0f5h		
+	defb 0cdh		
+	defb 00eh		
+	defb 00ch		
+	defb 0cah		
+	defb 010h		
+	defb 034h		
+	defb 0cdh		
+	defb 015h		
+	defb 005h		
+	defb 0cah		
+	defb 0c7h		
+	defb 018h		
+	defb 0f1h		
+	defb 0c3h		
+	defb 03eh		
+	defb 031h		
+	defb 021h		
+	defb 01ah		
+	defb 034h		
+	defb 0c3h		
+
+; BLOCK 'stack_overflow' (start 0x8947 end 0x8970)
+stack_overflow_start:
+	defb 072h		
+	defb 00dh		
+	defb 03fh		
+	defm "Stack overflow, try more P switches"
+	defb 00dh		
+	defb 00ah		
+	defb 000h		
+stack_overflow_end:
+	defb 0cdh		
+	defb 0c4h		
+	defb 028h		
+	defb 03ah		
+	defb 011h		
+	defb 03eh		
+	defb 0feh		
+	defb 020h		
+	defb 0cah		
+	defb 04fh		
+	defb 034h		
+	defb 011h		
+	defb 000h		
+	defb 000h		
+	defb 0ebh		
+	defb 022h		
+	defb 0fdh		
+	defb 03fh		
+	defb 0cdh		
+	defb 0feh		
+	defb 02fh		
+	defb 0c1h		
+	defb 0d1h		
+	defb 0e1h		
+	defb 001h		
+	defb 063h		
+	defb 034h		
+	defb 0c5h		
+	defb 0d5h		
+	defb 03eh		
+	defb 00dh		
+	defb 0c3h		
+	defb 05ch		
+	defb 004h		
+	defb 0c1h		
+	defb 001h		
+	defb 05eh		
+	defb 034h		
+	defb 0c5h		
+	defb 0cdh		
+	defb 055h		
+	defb 00bh		
+	defb 0feh		
+	defb 03ah		
+	defb 0cch		
+	defb 055h		
+	defb 00bh		
+	defb 0cdh		
+	defb 048h		
+	defb 030h		
+; BLOCK 'end_fill' (start 0x89a2 end 0x8eff)
+end_fill_start:
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+l89e2h:
+sector_buffer:
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 028h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 088h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0f7h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 010h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 028h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 028h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0feh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 088h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h			
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 080h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0f7h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 008h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0c0h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0efh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fch		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 008h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 088h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0c8h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 012h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 002h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 001h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 020h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0efh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 080h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 002h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 061h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0feh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0efh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 048h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 080h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 002h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 002h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0c8h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 010h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 008h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0a0h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0fdh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+	defb 000h		
+	defb 0ffh		
+end_fill_end:
+	nop			;8eff	00 	. 
