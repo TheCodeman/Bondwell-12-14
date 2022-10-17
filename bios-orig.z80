@@ -1,6 +1,11 @@
+; https://github.com/TheCodeman/Bondwell-12-14
 ; z80dasm 1.1.5
 ; command line: z80dasm -a -l -t -g 0xea00 -b bios.blk -z -s bios.sym -o bios.z80 bios.bin
-; disassembled By Ken Segler -> 	
+; disassembled By Ken Segler 
+; assemble with linux z80asm --list=bios.lst  bios.z80  -o bwbios.bin
+; setting build_orignal to 1 will build excact rom image
+; setting build_orignal to 0 will build without random data in buffer areas
+;
 build_orignal:	equ 1
 		
 ccp_start: 	equ	0d400h
