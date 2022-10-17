@@ -159,8 +159,8 @@ l7f77h:
 	jr nz,l7f77h	
 	jr l7f58h		
 
-; BLOCK 'copywright' (start 0x7f80 end 0x8000)
-copywright_start:
+; BLOCK 'copyright' (start 0x7f80 end 0x8000)
+copyright_start:
 	defm "BOOT ROM OF BONDWELL 12/14 COMPUTER,COPYRIGHT (C) 1984 BY BONDWELL INTERNATIONAL LIMITED. NO PART OF THIS ROM MAY BE REPRODUCED."
 
      
