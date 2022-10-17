@@ -1,0 +1,2208 @@
+; z80dasm 1.1.5
+; command line: z80dasm -a -l -t -g 0xea00 -b bios.blk -z -s bios.sym -o bios.z80 bios.bin
+; disassembled By Ken Segler -> 	
+build_orignal:	equ 1
+		
+ccp_start: 	equ	0d400h
+ccp_3:		equ ccp_start+3
+ccp_7:		equ ccp_start+7
+
+bios_start:	equ	0ea00h
+
+		
+;io port 0-7	IC18 74LS259
+bank_a0_low:	equ 000h
+bank_a0_high:	equ 001h
+bank_a1_low:	equ 002h
+bank_a1_high:	equ 003h
+init_low:	equ 006h
+init_high:	equ 007h
+caps_lock_on:	equ 008h
+caps_lock_off:	equ 009h
+motor_0_low:	equ 00ah
+motor_0_high:	equ 00bh
+motor_1_low:	equ 00ch
+motor_1_high:	equ 00dh
+fdc_tc_low:	equ 00eh
+fdc_tc_high:	equ 00fh
+		
+fdc_status_reg:	equ 020h
+fdc_data_reg:	equ 021h
+dac_data:	equ 050h
+		
+crtc_add_reg:	equ 010h
+crtc_data_reg:	equ 011h
+		
+
+		org bios_start
+		jp cold_boot
+lea03h:	
+		jp warm_start
+		jp const
+		jp conin
+		jp conout
+		jp list
+		jp punch
+		jp reader
+		jp home
+		jp seldsk
+		jp settrk
+		jp setsec
+		jp setdma
+		jp read
+		jp write
+		jp lee6bh
+		jp sectran
+		jp lee7fh
+
+; BLOCK 'bin_data0' (start 0xea36 end 0xea3a)
+bin_data0_start:					;eb50
+		db  000h
+		db  005h
+lea38h:	
+		db  024h
+		db  005h
+bin_data0_end:	
+		
+; BLOCK 'bin_data1' (start 0xea3a end 0xea3b)
+bin_data1_start:	
+		db  024h
+bin_data1_end:	
+		
+; BLOCK 'bin_data2' (start 0xea3b end 0xea7e)
+bin_data2_start:	
+		db  00ah
+		db  06fh
+		db  0eah
+		db  0dfh
+		db  0eeh
+dph_0:	
+lea40h:					;dph0
+		dw 00000h
+		dw 00000h
+		dw 00000h
+		dw 00000h
+		dw cpm_banner
+		dw dpb0
+		dw dph0_cv		;Check Sum Vector Address of a scratch pad area used for software check for changed disks. 
+						;This address is different for each DPH.
+		dw dph0_av		;Allocation Vector Address of a scratch pad area used by the BDOS to keep disk storage allocation information. 
+						;This address is different for each DPH.
+		
+dph_1:	
+lea50h:					;dph1
+		dw 00000h
+		dw 00000h
+		dw 00000h
+		dw 00000h
+		dw cpm_banner
+		dw dpb1			;lea6fh
+		dw dph1_cv
+		dw dph1_av
+		
+dpb0:	;lea60h:		;dpb0
+		dw 00024h
+		db  004h
+		db  00fh
+		db  001h
+		dw 0054h
+		dw 007fh
+		db  0c0h
+		db  000h
+		dw 00020h
+		dw 0002h
+		
+dpb1:	;lea6fh:		;dpb1
+		dw 00024h
+		db  004h
+		db  00fh
+		db  001h
+		dw 0054h
+		dw 007fh
+		db  0c0h
+		db  000h
+		dw 00020h
+		dw 0002h
+		
+		
+		
+;bin_data2_end:
+cold_boot:	
+		in a, (bank_a1_low) ;bank a1 = 0
+		in a, (bank_a0_low) ;bank a0 = 1
+		jp lf4bfh
+;lea85h:
+warm_start:	
+		ld sp, 00080h 	;set stack
+		in a, (fdc_tc_low) ;mem bank a0
+		xor a 			;zero a
+		ld (lf1ech), a 	;drive number
+		ld (lf1edh), a 	;
+		ld (lf1eeh), a 	;
+		ld c, a 		;set c to 0
+		call seldsk 	;select drive 0
+		ld hl, ccp_start	;0d400h 	
+		ld (set_dma_address), hl ;
+		ld b, 016h
+leaa0h:	
+		push bc
+		call read_sector ;read sector
+		ld hl, sector_buffer ;move 256 bytes from f3bfh to d400h
+		ld de, (set_dma_address) ;start of ccp
+		ld bc, 00100h
+		ldir 			;LD (DE),(HL)
+		
+		ld hl, (set_dma_address) ;start of ccp
+		ld de, 00100h
+		add hl, de
+		ld (set_dma_address), hl ;inc start of ccp by 256
+		ld a, (lf1eeh)
+		inc a
+		ld (lf1eeh), a
+		cp 012h
+		jr nz, leacdh
+		xor a
+		ld (lf1eeh), a
+		inc a
+		ld (lf1edh), a
+leacdh:	
+		pop bc
+		djnz leaa0h
+		in a, (motor_0_low) ;motor_0 = 0
+		in a, (motor_1_low) ;motor_1 = 0
+		xor a
+		ld (lf1f0h), a
+		ld (lf1f2h), a
+		ld a, 0c3h
+		ld (00000h), a
+		ld hl, lea03h
+		ld (00001h), hl
+		ld (00005h), a
+		ld hl, 0dc06h
+		ld (00006h), hl
+		ld a, (00004h)
+		cp 002h
+		jr c, leaf7h
+		xor a
+leaf7h:	
+		ld c, a
+		jp lf4edh 		;jump to bdos
+;
+;
+;
+const:	
+		ld a, (lf213h)
+		or a
+		jr nz, leb16h
+		ld a, (lf217h)
+		cp 0ffh
+		jr nz, leb16h
+		in a, (03fh)
+		and 080h
+		ret z
+		call sub_eb50h
+		ld (lf217h), a
+		xor 0ffh
+		ret z
+leb16h:	
+		ld a, 0ffh
+		ret
+;
+;
+;
+;
+conin:	
+		ld a, (lf213h)
+		or a
+		jr z, leb35h
+		dec a
+		ld (lf213h), a
+		ld hl, (lf214h)
+		ld b, (hl)
+		inc hl
+		ld (lf214h), hl
+		ld a, (hl)
+		or a
+		jr nz, leb33h
+		xor a
+		ld (lf213h), a
+leb33h:	
+		ld a, b
+		ret
+;
+;
+;
+;
+leb35h:	
+		ld a, (lf217h)
+		cp 0ffh
+		jr z, leb42h
+		ld hl, lf217h
+		ld (hl), 0ffh
+		ret
+;
+;
+;
+;
+leb42h:	
+		in a, (03fh)
+		sla a
+		jr nc, leb42h
+		call sub_eb50h
+		cp 0ffh
+		jr z, conin
+		ret
+;
+;
+;
+;	keyboard read ?
+sub_eb50h:	
+		ld de, bin_data3_start
+		ld hl, 00000h
+		ld bc, 00900h
+leb59h:	
+		in a, (03ch)
+		sla a
+		jp p, leb68h
+		ld a, (de)
+		inc de
+		add a, c
+		ld c, a
+		ld a, (de)
+		add a, l
+		ld l, a
+		dec de
+leb68h:	
+		inc de
+		inc de
+		ld a, 034h
+		out (03fh), a
+		ld a, 03ch
+		out (03fh), a
+		djnz leb59h
+		ld a, l
+		xor 000h
+		ld l, a
+		cp 07fh
+		jr nz, leb7eh
+		ld l, 03fh
+leb7eh:	
+		ld a, c
+		cp 003h
+		jp z, lec01h
+		cp 001h
+		jr nz, leb8ch
+		ld de, 0005ah
+		add hl, de
+leb8ch:	
+		ld de, lf219h
+		add hl, de
+		ld a, (hl)
+		cp 0ffh
+		jr z, lec01h
+		ld b, a
+		ld a, c
+		cp 002h
+		jr nz, lebadh
+		ld a, b
+		cp 040h
+		jr c, lec01h
+		cp 080h
+		jr nc, lec01h
+		cp 060h
+		jr c, lebaah
+		sub 020h
+lebaah:	
+		sub 040h
+		ld b, a
+lebadh:	
+		ld a, b
+		and 0f0h
+		cp 080h
+		jr nz, lebd9h
+		ld a, (bin_data0_start)
+		cp 003h
+		jr z, lec01h
+		ld a, b
+		sla a
+		sla a
+		sla a
+		sla a
+		ld l, a
+		ld h, 000h
+		ld de, function_keys
+		add hl, de
+		ld (lf214h), hl
+		ld a, (hl)
+		or a
+		jr z, lec01h
+		ld a, 010h
+		ld (lf213h), a
+		jr lec01h
+lebd9h:	
+		ld a, b
+		cp 0cah
+		jr nz, lebebh
+		ld a, (lf1feh)
+		xor 001h
+		ld (lf1feh), a
+		ld c, a
+		out (c), a
+		jr lec01h
+lebebh:	
+		ld hl, lf1feh
+		bit 0, (hl)
+		jr nz, lebfch
+		cp 061h
+		jr c, lebfch
+		cp 07bh
+		jr nc, lebfch
+		sub 020h
+lebfch:	
+		ld b, a
+		in a, (03eh) 	;pia
+		ld a, b
+		ret
+;
+;
+;
+;
+lec01h:	
+		ld a, 0ffh
+		jr lebfch
+		
+bin_data3_start:	
+		db  001h
+bin_data3_end:	
+		
+;keyboard buffer ?
+bin_data4_start:	
+		db  000h
+		db  000h
+		db  008h
+		db  000h
+		db  002h
+		db  000h
+		db  001h
+		db  000h
+		db  004h
+		db  000h
+		db  010h
+		db  000h
+		db  020h
+		db  002h
+		db  000h
+		db  000h
+		db  040h
+		
+conout:	
+		ld a, (lf1fch) 	;esc counter
+		or a
+		jp nz, led01h 	;count down esc counter
+		ld a, (graphics_mode_flag) ;check for graphics mode
+		or a
+		jr nz, lec4eh
+		ld a, c
+		ld hl, char_jump_table
+lec28h:	
+		ld b, (hl)
+lec29h:	
+		inc hl
+		cp (hl)
+		inc hl
+		ld e, (hl)
+		inc hl
+		ld d, (hl)
+		jr z, lec33h
+		djnz lec29h
+lec33h:	
+		ex de, hl
+		jp (hl) 		;jump char function
+		
+;
+;
+;
+;beep
+lec35h:	
+		ld c, 000h
+beep:	
+lec37h:	
+		ld a, 040h
+		out (dac_data), a
+		ld b, 028h
+lec3dh:	
+		djnz lec3dh
+		xor a
+		out (dac_data), a
+		ld b, 028h
+lec44h:	
+		djnz lec44h
+		dec c
+		jr nz, lec37h
+		ret
+;
+;
+;
+;
+lec4ah:	
+		ld a, 001h
+		jr lec54h
+		
+lec4eh:	
+		ld a, c
+		cp 000h
+		jr nz, lec58h
+		xor a
+lec54h:	
+		ld (graphics_mode_flag), a
+		ret
+;
+;
+;
+;write char in a to screen memory
+lec58h:	
+		and 07fh
+		ld a, (keyscan_start)
+		or c
+		call calc_screen_address
+		ld (hl), a
+lec62h:	
+		ld a, (x_pos)
+		cp 04fh 		;check eol
+		jr z, lec6fh
+		inc a
+		ld (x_pos), a
+		jr set_cursor_position
+lec6fh:	
+		xor a
+		ld (x_pos), a
+		
+;handle line feed
+handle_line_feed:	
+		ld a, (y_pos)
+		cp 018h
+		jr z, scroll_up_screen
+		inc a
+		ld (y_pos), a
+		jr set_cursor_position
+;
+;
+;
+; scroll screen up one line clear line
+scroll_up_screen:	
+		ld hl, 0f850h
+		ld de, 0f800h
+		ld bc, 00780h
+		ldir
+		ld b, 050h
+		ld hl, 0ff80h
+		xor a
+lec91h:	
+		ld (hl), a
+		inc hl
+		djnz lec91h
+;
+;set cursor position
+; r14 cursor high 0eh
+; r15 cursor low  0fh
+set_cursor_position:					;set cursor position
+		call calc_screen_address ;calculate cursor pos ?
+		ld a, 00eh
+		out (crtc_add_reg), a
+		ld a, h
+		and 007h
+		out (crtc_data_reg), a
+		ld a, 00fh
+		out (crtc_add_reg), a
+		ld a, l
+		out (crtc_data_reg), a
+		ret
+;
+;
+;
+; do cr
+leca9h:	
+		xor a
+		ld (x_pos), a
+		jr set_cursor_position
+;
+;
+;backsace
+lecafh:	
+		ld a, (x_pos)
+		dec a
+		jp p, lecc1h
+		ld a, (y_pos)
+		or a
+		ret z
+		dec a
+		ld (y_pos), a
+		ld a, 04fh
+lecc1h:	
+		ld (x_pos), a
+		jr set_cursor_position
+lecc6h:	
+		call calc_screen_address
+zero_ram:	
+		ld (hl), 000h
+		inc hl
+		ld a, h
+		or l
+		jr nz, zero_ram
+		ret
+;
+;
+;
+;
+sub_ecd1h:	
+clear_screen:	
+		ld hl, 0f800h
+		call zero_ram 	;clear screen memory
+lecd7h:	
+		xor a
+		ld (x_pos), a
+		ld (y_pos), a
+		jr set_cursor_position ;home cursor 0,0
+;
+;
+;
+;
+sub_ece0h:	
+lece0h:	
+		call calc_screen_address
+		ld a, (x_pos)
+lece6h:	
+		ld (hl), 000h
+		inc hl
+		inc a
+		cp 050h
+		jr nz, lece6h
+		ret
+;
+;
+;
+;back space
+lecefh:	
+		ld a, (y_pos)
+		or a
+		ret z
+		dec a
+		ld (y_pos), a
+		jp set_cursor_position
+		
+;
+;
+;
+;esc code
+lecfbh:	
+		ld a, 003h
+		ld (lf1fch), a
+		ret
+;
+;
+;
+;
+led01h:	
+		ld a, (lf1fch)
+		dec a
+		ld (lf1fch), a
+		cp 002h
+		jr nz, led29h
+		ld a, c
+		cp 03dh 		;=
+		ret z
+		xor a
+		ld (lf1fch), a
+		ld a, c
+		and 07fh
+		ld hl, ledcdh
+		jp lec28h
+;
+;
+;
+;
+led1dh:	
+		ld a, 080h
+		jr led22h
+led21h:	
+		xor a
+led22h:	
+		ld (keyscan_start), a
+led25h:	
+		ret
+		ld (hl), 000h
+		ret
+;
+;
+;
+;
+led29h:	
+		or a
+		jr z, led31h
+		ld a, c
+		ld (lf1fdh), a
+		ret
+;
+;
+;
+;
+led31h:	
+		ld a, c
+		sub 020h
+		ld (x_pos), a
+		ld a, (lf1fdh)
+		sub 020h
+		ld (y_pos), a
+		jp set_cursor_position
+;
+;
+;
+;
+led42h:	
+		xor a
+		ld (x_pos), a
+		ld a, (y_pos)
+		cp 018h
+		jr z, led8ch
+		call calc_screen_address
+		push hl
+		ld de, 00050h
+		add hl, de
+		ex de, hl
+		ld hl, 0ffd0h
+		or a
+		sbc hl, de
+		ld b, h
+		ld c, l
+		pop hl
+		ex de, hl
+		ldir
+		xor a
+		ld hl, 0ff80h
+		call lece6h
+		jp set_cursor_position
+;
+;
+;
+;scroll screen up
+led6ch:	
+		xor a
+		ld (x_pos), a
+		ld a, (y_pos)
+		cp 018h
+		jr z, led8ch
+		call calc_screen_address
+		push hl
+		ld hl, 0ff80h
+		pop bc
+		or a
+		sbc hl, bc
+		ld b, h
+		ld c, l
+		ld hl, 0ff7fh
+		ld de, 0ffcfh
+		lddr
+led8ch:	
+		call sub_ece0h
+		jp set_cursor_position
+;
+;
+;calculate screen char position
+;
+calc_screen_address:	
+		ld hl, (y_pos)
+		add hl, hl
+		add hl, hl
+		add hl, hl
+		add hl, hl
+		ld d, h
+		ld e, l
+		add hl, hl
+		add hl, hl
+		add hl, de
+		ld de, (x_pos)
+		add hl, de
+		ld de, 0f800h
+		add hl, de
+		ret
+		
+;
+;
+;video control char jump table
+;emulates Lear-Siegler ADM-3A terminal
+char_jump_table:	
+		db  00ch
+leda9h:	
+		db  00dh
+ledaah:	
+		dw leca9h 		;
+ledach:	
+		db  00ah
+ledadh:	
+		dw handle_line_feed ; handle line feed
+		
+		db  008h
+		dw lecafh 		; cursor left
+		
+		db  01ah 		;clear screen home cursor
+		dw clear_screen ;
+		
+		db  018h 		;erase to left
+		dw lece0h 		;
+		
+		db  017h 		;erase to end of screen
+		dw lecc6h
+		
+		db  00ch 		;cursor right
+		dw lec62h
+		
+		db  01eh 		;home cursor
+		dw lecd7h
+		
+		db  01bh 		; escape
+		dw lecfbh
+		
+		db  00bh 		; cursor up
+		dw lecefh
+		
+		db  007h 		; bell
+		dw lec35h
+		
+		db  020h 		; space
+		dw lec58h
+		
+		
+		
+ledcdh:	
+		db  00ah
+ledceh:	
+		db  02ah
+		dw clear_screen
+		
+		db  059h 		;y
+		dw lecc6h 		;erase to end of screen
+		
+		db  054h 		;t
+		dw lece0h 		;erase to left
+		
+		db  052h 		;r
+		dw led42h
+		
+		db  045h 		;e
+		dw led6ch 		;scroll screen up
+		
+		db  00ch 		;ff
+		dw clear_screen
+		
+		db  047h 		;set graphics mode disables cr and lf
+		dw lec4ah 		; write 1 to graphics_mode_flag
+		
+		db  049h 		;i
+		dw led1dh 		;reverse video on
+		
+		db  04eh 		;n
+		dw led21h 		;reverse video off
+		
+		db  020h 		;space
+		dw led25h 		;return
+		
+list:	
+		ld a, (00003h)
+		bit 7, a
+		jp z, conout
+		bit 6, a
+		jp nz, lee22h
+		ld a, c
+		out (03eh), a 	;pia
+ledfch:	
+		nop
+		in a, (03ch) 	;pia
+		rra
+		jr nc, ledfch
+		call small_delay_start
+		ld a, 036h
+		out (03dh), a 	;pia
+		call small_delay_start
+		ld a, 03eh 		;pia
+		out (03dh), a
+		ret
+		
+		
+		
+;lee11h:
+punch:	
+		ld a, (00003h)
+		bit 4, a
+		jr nz, lee22h
+		bit 5, a
+		jp z, conout
+		ld b, c
+		ld c, 043h
+		jr lee25h
+lee22h:	
+		ld b, c
+		ld c, 041h
+lee25h:	
+		nop
+		in a, (c)
+		and 004h
+		jr z, lee25h
+		ld a, b
+		dec c
+		out (c), a
+		ret
+;lee31h:
+		
+		
+reader:	
+		ld hl, lea38h
+		ld a, (00003h)
+		bit 2, a
+		jr nz, lee46h
+		bit 3, a
+		jp z, conin
+		inc hl
+		inc hl
+		ld c, 043h
+		jr lee48h
+lee46h:	
+		ld c, 041h
+lee48h:	
+		nop
+		in a, (c)
+		and 001h
+		jr z, lee48h
+		ld a, (hl)
+		and 030h
+		srl a
+		srl a
+		srl a
+		srl a
+		ld e, a
+		ld d, 000h
+		ld hl, lee67h
+		add hl, de
+		ld b, (hl)
+		dec c
+		in a, (c)
+		and b
+		ret
+lee67h:	
+		rra
+		ccf
+		ld a, a
+		rst 38h
+lee6bh:	
+	
+		ld a, (00003h)
+		and 0c0h
+		cp 080h
+		jr z, lee77h
+		ld a, 0ffh
+		ret
+lee77h:	
+		in a, (03ch) 	;pia
+		and 001h
+		ret z
+		ld a, 0ffh
+		ret
+lee7fh:	
+
+		ld hl, function_keys ; 0f6bfh
+		ret
+;lee83h:
+		
+		
+home:	
+
+		xor a
+		ld (track), a 	;lf1eah),a
+		ld a, (lf1f0h + 1)
+		or a
+		ret nz
+		ld (lf1f0h), a
+		ret
+;
+;
+;
+;lee90h:
+seldsk:	
+		ld hl, 00000h
+		ld a, c
+		cp 002h
+		ret nc
+		ld (selected_drive), a
+sub_ee9ah:	
+		or a
+		jr z, leea2h
+		ld hl, drive_1_start
+		jr leea5h
+leea2h:	
+		ld hl, drive_0_start
+		
+leea5h:	
+		ld b, 009h
+		ld ix, leec4h
+leeabh:	
+		ld e, (ix + 000h)
+		inc ix
+		ld d, (ix + 000h)
+		inc ix
+		ld a, (hl)
+		ld (de), a
+		inc hl
+		djnz leeabh
+		ld hl, dph_0 	;lea40h
+		ld a, c
+		or a
+		ret z
+		ld hl, dph_1 	;lea50h
+		ret
+		
+; BLOCK 'bin_data6' (start 0xeec4 end 0xeed6)
+leec4h:	
+		dw 0ef1ah
+leec6h:	
+		dw 0ef58h
+		dw 0ef7ah
+		dw 0ef7ch
+		dw 0efdah
+		dw 0f116h
+		dw 0f108h
+		dw 0f10dh
+		dw 0f103h
+		
+; BLOCK 'drive_0' (start 0xeed6 end 0xeedf)
+drive_0_start:	
+		db  010h
+		db  024h
+		db  000h
+		db  000h
+		db  001h
+		db  001h
+		db  001h
+		db  00ah
+		db  000h
+		
+; BLOCK 'drive_1' (start 0xeedf end 0xeee8)
+drive_1_start:	
+		db  010h
+		db  024h
+		db  000h
+		db  000h
+		db  001h
+		db  001h
+		db  001h
+		db  00ah
+		db  000h
+		
+		
+settrk:	
+		ld a, c
+		ld (track), a
+		ret
+;leeedh:
+		
+setsec:	
+		ld a, c
+		ld (sector), a 	;lf1ebh
+		ret
+;leef2h:
+		
+		
+setdma:	
+		ld h, b
+		ld l, c
+		ld (set_dma_address), hl
+		ret
+;leef8h:
+		
+		
+read:	
+		xor a
+		ld (lf1f2h), a
+		inc a
+		ld (lf1f7h + 1), a
+		ld (lf1f7h), a
+		inc a
+		ld (lf1f7h + 2), a
+		jp lef70h
+;lef0ah:
+		
+		
+write:	
+		ld a, c
+		ld (lf1f7h + 2), a
+		xor a
+		ld (lf1f7h + 1), a
+		ld a, (lf1f7h + 2)
+		cp 002h
+		jr nz, lef30h
+		ld a, 0x10 		;0ef1ah
+		ld (lf1f2h), a
+		ld a, (selected_drive)
+		ld (lf1f3h), a
+		ld a, (track) 	;lf1eah)
+		ld (lf1f4h), a
+		ld a, (sector) 	;lf1ebh)
+		ld (lf1f5h), a
+lef30h:	
+		ld a, (lf1f2h)
+		or a
+		jr z, lef68h
+		dec a
+		ld (lf1f2h), a
+		ld a, (selected_drive)
+		ld hl, lf1f2h + 1
+		cp (hl)
+		jr nz, lef68h
+		ld a, (lf1f2h + 2)
+		ld hl, track 	;lf1eah
+		cp (hl)
+		jr nz, lef68h
+		ld a, (sector) 	;lf1ebh)
+		ld hl, lf1f5h
+		cp (hl)
+		jr nz, lef68h
+		inc (hl)
+		ld a, (hl)
+		cp 024h 		;0ef58h
+		jr c, lef61h
+		ld (hl), 000h
+		ld hl, lf1f2h + 2
+		inc (hl)
+lef61h:	
+		xor a
+		ld (lf1f7h), a
+		jp lef70h
+lef68h:	
+		xor a
+		ld (lf1f2h), a
+		inc a
+		ld (lf1f7h), a
+;
+;
+;
+;
+lef70h:	
+		xor a
+		ld (lf1f5h + 1), a
+		ld a, (sector) 	;lf1ebh)
+		or a
+		rra
+		or a
+		nop
+		or a
+		nop
+		ld (lf1efh), a
+		ld hl, lf1f0h
+		ld a, (hl)
+		ld (hl), 001h
+		or a
+		jr z, lefb9h
+		ld a, (selected_drive)
+		ld hl, lf1ech
+		cp (hl)
+		jr nz, lefa4h
+		ld a, (track)
+		ld hl, lf1edh
+		cp (hl)
+		jr nz, lefa4h
+		ld a, (lf1efh)
+		ld hl, lf1eeh
+		cp (hl)
+		jr z, lefd6h
+lefa4h:	
+		ld a, (lf1f0h + 1)
+		or a
+		jr z, lefb9h
+		ld a, (lf1ech)
+		call sub_ee9ah
+		call write_sector
+		ld a, (selected_drive)
+		call sub_ee9ah
+lefb9h:	
+		ld a, (selected_drive)
+		ld (lf1ech), a
+		ld a, (track)
+		ld (lf1edh), a
+		ld a, (lf1efh)
+		ld (lf1eeh), a
+		ld a, (lf1f7h)
+		or a
+		call nz, read_sector
+		xor a
+		ld (lf1f0h + 1), a
+;
+;
+;
+;
+lefd6h:	
+		ld a, (sector)
+		and 001h
+		ld l, a
+		ld h, 000h
+		add hl, hl
+		add hl, hl
+		add hl, hl
+		add hl, hl
+		add hl, hl
+		add hl, hl
+		add hl, hl
+		ld de, sector_buffer ;0f3bfh
+		add hl, de
+		ld de, (set_dma_address)
+		ld bc, 00080h
+		ld a, (lf1f7h + 1)
+		or a
+		jr nz, leffch
+		ld a, 001h
+		ld (lf1f0h + 1), a
+		ex de, hl
+leffch:	
+		ldir
+		ld a, (lf1f7h + 2)
+		cp 001h
+		ld a, (lf1f5h + 1)
+		jr nz, lf015h
+		or a
+		jr nz, lf015h
+		xor a
+		ld (lf1f0h + 1), a
+		call write_sector
+		ld a, (lf1f5h + 1)
+lf015h:	
+		out (motor_0_low), a
+		out (motor_1_low), a
+		ret
+sectran:	
+		
+		ld h, b
+		ld l, c
+		ret
+;
+;drive motor select
+;
+;
+drive_motor_select:	
+		ld a, (lf1ech) 	;selected drive ?
+		or a
+		jr z, lf029h
+		ld b, 00dh 		;motor_1=1
+		ld c, 00ah 		;motor_0=0
+		jr lf02dh
+lf029h:	
+		ld b, 00bh 		;motor_0=1
+		ld c, 00ch 		;motor_1=0
+lf02dh:	
+		in a, (03ch) 	;pia
+		out (c), a
+		ld c, b
+		out (c), a
+		and 008h
+		ret nz
+		ld de, 00064h
+		jp delay_de
+;
+;
+;seek drive
+;
+seek_drive:	
+		call fdc_wait_busy
+		ld hl, fdc_seek_command ;seek drive
+		ld de, lf1ffh
+		ld bc, 00003h
+		ldir
+		
+		ld hl, lf1ech
+		ld a, (lf1edh)
+		cp 028h
+		jr nc, lf05bh
+		ld (fdc_selected_drive_start), a
+		xor a
+		jr lf062h
+lf05bh:	
+		sub 028h
+		ld (fdc_selected_drive_start), a
+		ld a, 004h
+lf062h:	
+		or (hl)
+		inc a
+		ld (fdc_sense_drive_status_end), a
+		ld (lf200h), a
+		ld a, (fdc_selected_drive_start)
+		ld (lf201h), a
+		ld c, 003h
+		call fdc_wait_rqm ;sub_f174h
+		call fdc_wait_int ;sub_f1bfh
+		call fdc_sense_int_status ;sub_f083h
+		ld a, (lf208h)
+		and 020h
+		jr z, seek_drive
+		ret
+;
+;
+;
+;
+fdc_sense_int_status:	
+		call fdc_wait_busy
+		ld hl, lf1d2h
+		ld de, lf1feh + 1
+		ld bc, 00001h
+		ldir
+		ld c, 001h
+		call fdc_wait_rqm ;sub_f174h
+		ld c, 002h
+		call sub_f18ah
+		ret
+;
+;
+;
+;
+fdc_sense_drive_status:					;sub_f09ch:
+		call fdc_wait_busy
+		ld hl, fdc_sense_drive_status_cmd
+		ld de, lf1feh + 1
+		ld bc, 00002h
+		ldir
+		ld a, (lf1ech)
+		inc a
+		ld (lf200h), a
+		ld c, 002h
+		call fdc_wait_rqm ;sub_f174h
+		ld c, 001h
+		call sub_f18ah
+		ret
+;
+;read sector
+;
+;
+read_sector:	
+		call drive_motor_select ;drive motor select
+		ld hl, fdc_read_cmd
+		ld iy, lf129h
+		jr lf0ddh
+;
+;write sector
+;
+;
+write_sector:	
+		call drive_motor_select
+		call fdc_sense_drive_status ;sub_f09ch
+		ld a, (lf208h)
+		and 040h
+		ld hl, fdc_write_cmd
+		ld iy, lf12fh
+		jp nz, lf16eh
+;
+;common read write code
+;lf1ffh		46h	cmd
+;lf200h		01h	head drive number
+;lf201h		00h	cylinder
+;lf202h		00h	head
+;lf203h		01h	number
+;lf204h		01h	eot
+;lf205h		12h	gpl
+;lf206h		0ah	stp
+;lf207h		ffh
+;
+lf0ddh:	
+		push hl
+		call seek_drive ;seek drive
+		call fdc_wait_busy
+		pop hl
+		ld de, lf1ffh
+		ld bc, 00009h
+		ldir
+		
+		ld a, (fdc_sense_drive_status_end)
+		ld (lf200h), a
+		srl a
+		srl a
+		ld (lf202h), a 	;head
+		ld a, (fdc_selected_drive_start)
+		ld (lf201h), a 	;cylinder
+		ld a, (lf1eeh)
+		nop
+		ld (lf203h), a
+		ld a, 001h
+		ld (lf204h), a
+		ld a, 00ah
+		ld (lf206h), a
+		ld a, (bin_data2_start)
+		ld e, a
+lf115h:	
+		ld d, 001h
+		ld b, 000h
+		ld c, 009h
+		call fdc_wait_rqm ;sub_f174h
+		ld hl, sector_buffer ;0f3bfh
+lf121h:	
+		nop
+		in a, (03ch)
+		rla
+		jr nc, lf121h
+lf127h:	
+		jp (iy)
+lf129h:	
+		in a, (fdc_data_reg)
+		ld (hl), a
+		jp lf132h
+lf12fh:	
+		ld a, (hl)
+		out (fdc_data_reg), a
+lf132h:	
+		inc hl
+		djnz lf14ch
+		dec d
+		jp nz, lf14ch
+		call fdc_toggle_tc
+		call fdc_wait_int ;sub_f1bfh
+		ld c, 007h
+		call sub_f18ah
+		ld a, (lf208h)
+		and 0c0h
+		jr nz, lf16ah
+		ret
+		
+		
+lf14ch:	
+		in a, (03ch)
+		rla
+		jr c, lf127h
+		in a, (03ch)
+		rla
+		jr c, lf127h
+		in a, (03ch)
+		rla
+		jr c, lf127h
+		in a, (03ch)
+		rla
+		jr c, lf127h
+		in a, (03ch)
+		rla
+		jr c, lf127h
+		ld c, 006h
+		call sub_f18ah
+lf16ah:	
+		dec e
+		jp nz, lf115h
+lf16eh:	
+		ld a, 001h
+		ld (lf1f5h + 1), a
+		ret
+;
+;
+;
+;fdc wait for rqm to be high
+fdc_wait_rqm:	
+		ld hl, lf1feh + 1
+lf177h:	
+		call small_delay_start
+		in a, (fdc_status_reg)
+		and 0c0h
+		cp 080h
+		jr nz, lf177h
+		ld a, (hl)
+		out (fdc_data_reg), a
+		inc hl
+		dec c
+		jr nz, lf177h
+		ret
+		
+		
+sub_f18ah:	
+		ld hl, lf208h
+;
+;
+; wait for dio and rqm
+lf18dh:	
+		call small_delay_start
+		in a, (fdc_status_reg)
+		and 0c0h 		; dio amd rqm
+		cp 0c0h
+		jr nz, lf18dh
+		in a, (fdc_data_reg)
+		ld (hl), a
+		inc hl
+		dec c
+		jr nz, lf18dh
+		ret
+		
+delay_de:	
+		ld b, 000h
+;
+;delay call small delay de number of times
+;
+delay:	
+		call small_delay_start
+		djnz delay
+		dec de
+		ld a, d
+		or e
+		jr nz, delay_de
+		ret
+;
+;
+;
+;
+fdc_toggle_tc:	
+		in a, (fdc_tc_high) ;set tc high
+		call small_delay_start
+		in a, (fdc_tc_low) ;set tc low
+		ret
+;
+;
+;
+;
+fdc_wait_busy:	
+		call small_delay_start
+		in a, (fdc_status_reg)
+		and 030h
+		jr nz, fdc_wait_busy
+		ret
+;
+;
+;
+;
+fdc_wait_int:	
+		nop
+		in a, (03ch) 	;check pia bit 7
+		rla
+		jr nc, fdc_wait_int
+		ret
+;
+;
+;
+; BLOCK 'small_delay' (start 0xf1c6 end 0xf1cf)
+small_delay_start:	
+		ex (sp), ix
+		ex (sp), ix
+		ex (sp), ix
+		ex (sp), ix
+		ret
+		
+fdc_seek_command:	
+		db 0fh
+		db 01h
+		db 00h
+lf1d2h:	
+		db  08h
+		
+; BLOCK 'fdc_read_cmd' (start 0xf1d3 end 0xf1dc)
+fdc_read_cmd:	
+		db  046h 		;read command
+		db  001h 		;cylinder
+		db  000h 		;head
+		db  000h 		;sector number
+		db  001h 		;number bytes
+		db  001h 		;eot
+		db  012h 		;gpl
+		db  00ah 		;dtl
+		db  0ffh
+		
+; BLOCK 'fdc_write_cmd' (start 0xf1dc end 0xf1e5)
+fdc_write_cmd:	
+		db  045h
+		db  001h
+		db  000h
+		db  000h
+		db  001h
+		db  001h
+		db  012h
+		db  00ah
+		db  0ffh
+		
+; BLOCK 'fdc_sense_drive_status' (start 0xf1e5 end 0xf1e7)
+fdc_sense_drive_status_cmd:	
+		db  004h
+		db  001h
+fdc_sense_drive_status_end:	
+		db 000h
+		
+; BLOCK 'fdc_selected_drive' (start 0xf1e8 end 0xf1e9)
+fdc_selected_drive_start:	
+		db 000h
+selected_drive:	
+		db 000h 		;f1e9	00 	.
+track:	
+;lf1eah:
+		db 0bh 			;f1ea	0b 	.
+sector:	
+;lf1ebh:
+		db 0feh
+lf1ech:	
+		db 027h
+		
+lf1edh:	
+		db 0cah
+lf1eeh:	
+		db 0a6h
+lf1efh:	
+		db 02eh
+;jp z,02ea6h		;f1ed	ca a6 2e 	. . .
+lf1f0h:	
+		dw 022feh
+;cp 022h		;f1f0	fe 22 	. "
+lf1f2h:	
+		db 0cah
+lf1f3h:	
+		db  0a6h
+lf1f4h:	
+		db  02eh
+lf1f5h:	
+		dw 03cfeh
+lf1f7h:	
+		dw 0c4cah
+		db 02eh
+set_dma_address:	
+		dw 03efeh
+lf1fch:	
+		db 000h
+lf1fdh:	
+		db 0cfh
+lf1feh:	
+		db 02eh
+;
+lf1ffh:	
+		db 0feh
+lf200h:	
+		db 02ch
+lf201h:	
+		db 0cah
+lf202h:	
+		db 0d9h
+lf203h:	
+		db 02eh
+lf204h:	
+		dw 020feh
+lf206h:	
+		db 0cah
+		db 0d9h
+lf208h:	
+		db 02eh
+		db 0feh
+		db 009h
+		db 0cah
+		db 0d9h
+		db 02eh
+		db 0feh
+y_pos:	
+		db 000h
+		db 000h
+x_pos:	
+		db 000h
+		db 000h
+lf213h:	
+		db 000h
+lf214h:	
+		db 021h
+		db 0cch
+graphics_mode_flag:	
+		db 000h
+lf217h:	
+		db 0ffh
+		
+		
+; BLOCK 'keyscan' (start 0xf218 end 0xf2c9)
+keyscan_start:	
+		db  000h
+lf219h:	
+		db  037h 		;f219	37 	7
+		db  038h 		;f21a	38 	8
+		db  039h 		;f21b	39 	9
+		db  030h 		;f21c	30 	0
+		db  031h 		;f21d	31 	1
+		db  032h 		;f21e	32 	2
+		db  033h 		;f21f	33 	3
+		db  034h 		;f220	34 	4
+		db  035h 		;f221	35 	5
+		db  036h 		;f222	36 	6
+		db  075h 		;f223	75 	u
+		db  069h 		;f224	69 	i
+		db  06fh 		;f225	6f 	o
+		db  070h 		;f226	70 	p
+		db  071h 		;f227	71 	q
+		db  077h 		;f228	77 	w
+		db  065h 		;f229	65 	e
+		db  072h 		;f22a	72 	r
+		db  074h 		;f22b	74 	t
+		db  079h 		;f22c	79 	y
+		db  08eh 		;f22d	8e 	.
+		db  08fh 		;f22e	8f 	.
+		db  00dh 		;f22f	0d 	.
+		db  02eh 		;f230	2e 	.
+		db  020h 		;f231	20
+		db  0cah 		;f232	ca 	.
+		db  08ah 		;f233	8a 	.
+		db  08bh 		;f234	8b 	.
+		db  08ch 		;f235	8c 	.
+		db  08dh 		;f236	8d 	.
+		db  086h 		;f237	86 	.
+		db  087h 		;f238	87 	.
+		db  088h 		;f239	88 	.
+		db  089h 		;f23a	89 	.
+		db  080h 		;f23b	80 	.
+		db  081h 		;f23c	81 	.
+		db  082h 		;f23d	82 	.
+		db  083h 		;f23e	83 	.
+		db  084h 		;f23f	84 	.
+		db  085h 		;f240	85 	.
+		db  013h 		;f241	13 	.
+		db  004h 		;f242	04 	.
+		db  033h 		;f243	33 	3
+		db  008h 		;f244	08 	.
+		db  040h 		;f245	40 	@
+		db  0ffh 		;f246	ff 	.
+		db  02dh 		;f247	2d 	-
+		db  05dh 		;f248	5d 	]
+		db  005h 		;f249	05 	.
+		db  018h 		;f24a	18 	.
+		db  039h 		;f24b	39 	9
+		db  018h 		;f24c	18 	.
+		db  032h 		;f24d	32 	2
+		db  00ah 		;f24e	0a 	.
+		db  07fh 		;f24f	7f 	
+		db  009h 		;f250	09 	.
+		db  05eh 		;f251	5e 	^
+		db  05bh 		;f252	5b 	[
+		db  037h 		;f253	37 	7
+		db  038h 		;f254	38 	8
+		db  06dh 		;f255	6d 	m
+		db  02ch 		;f256	2c 	,
+		db  02eh 		;f257	2e 	.
+		db  02fh 		;f258	2f 	/
+		db  07ah 		;f259	7a 	z
+		db  078h 		;f25a	78 	x
+		db  063h 		;f25b	63 	c
+		db  076h 		;f25c	76 	v
+		db  062h 		;f25d	62 	b
+		db  06eh 		;f25e	6e 	n
+		db  06ah 		;f25f	6a 	j
+		db  06bh 		;f260	6b 	k
+		db  06ch 		;f261	6c 	l
+		db  03bh 		;f262	3b 	;
+		db  061h 		;f263	61 	a
+		db  073h 		;f264	73 	s
+		db  064h 		;f265	64 	d
+		db  066h 		;f266	66 	f
+		db  067h 		;f267	67 	g
+		db  068h 		;f268	68 	h
+		db  036h 		;f269	36 	6
+		db  02dh 		;f26a	2d 	-
+		db  031h 		;f26b	31 	1
+		db  030h 		;f26c	30 	0
+		db  01bh 		;f26d	1b 	.
+		db  0ffh 		;f26e	ff 	.
+		db  03ah 		;f26f	3a 	:
+		db  00dh 		;f270	0d 	.
+		db  034h 		;f271	34 	4
+		db  035h 		;f272	35 	5
+		db  027h 		;f273	27 	'
+		db  028h 		;f274	28 	(
+		db  029h 		;f275	29 	)
+		db  07ch 		;f276	7c 	|
+		db  021h 		;f277	21 	!
+		db  022h 		;f278	22 	"
+		db  023h 		;f279	23 	#
+		db  024h 		;f27a	24 	$
+		db  025h 		;f27b	25 	%
+		db  026h 		;f27c	26 	&
+		db  055h 		;f27d	55 	U
+		db  049h 		;f27e	49 	I
+		db  04fh 		;f27f	4f 	O
+		db  050h 		;f280	50 	P
+		db  051h 		;f281	51 	Q
+		db  057h 		;f282	57 	W
+		db  045h 		;f283	45 	E
+		db  052h 		;f284	52 	R
+		db  054h 		;f285	54 	T
+		db  059h 		;f286	59 	Y
+		db  08eh 		;f287	8e 	.
+		db  08fh 		;f288	8f 	.
+		db  00dh 		;f289	0d 	.
+		db  02eh 		;f28a	2e 	.
+		db  020h 		;f28b	20
+		db  0cah 		;f28c	ca 	.
+		db  08ah 		;f28d	8a 	.
+		db  08bh 		;f28e	8b 	.
+		db  08ch 		;f28f	8c 	.
+		db  08dh 		;f290	8d 	.
+		db  086h 		;f291	86 	.
+		db  087h 		;f292	87 	.
+		db  088h 		;f293	88 	.
+		db  089h 		;f294	89 	.
+		db  080h 		;f295	80 	.
+		db  081h 		;f296	81 	.
+		db  082h 		;f297	82 	.
+		db  083h 		;f298	83 	.
+		db  084h 		;f299	84 	.
+		db  085h 		;f29a	85 	.
+		db  013h 		;f29b	13 	.
+		db  004h 		;f29c	04 	.
+		db  033h 		;f29d	33 	3
+		db  008h 		;f29e	08 	.
+		db  05ch 		;f29f	5c 	\
+		db  0ffh 		;f2a0	ff 	.
+		db  03dh 		;f2a1	3d 	=
+		db  07dh 		;f2a2	7d 	}
+		db  005h 		;f2a3	05 	.
+		db  018h 		;f2a4	18 	.
+		db  039h 		;f2a5	39 	9
+		db  060h 		;f2a6	60 	`
+		db  032h 		;f2a7	32 	2
+		db  00ah 		;f2a8	0a 	.
+		db  07fh 		;f2a9	7f 	
+		db  009h 		;f2aa	09 	.
+		db  07eh 		;f2ab	7e 	~
+		db  07bh 		;f2ac	7b 	{
+		db  037h 		;f2ad	37 	7
+		db  038h 		;f2ae	38 	8
+		db  04dh 		;f2af	4d 	M
+		db  03ch 		;f2b0	3c 	<
+		db  03eh 		;f2b1	3e 	>
+		db  03fh 		;f2b2	3f 	?
+		db  05ah 		;f2b3	5a 	Z
+		db  058h 		;f2b4	58 	X
+		db  043h 		;f2b5	43 	C
+		db  056h 		;f2b6	56 	V
+		db  042h 		;f2b7	42 	B
+		db  04eh 		;f2b8	4e 	N
+		db  04ah 		;f2b9	4a 	J
+		db  04bh 		;f2ba	4b 	K
+		db  04ch 		;f2bb	4c 	L
+		db  02bh 		;f2bc	2b 	+
+		db  041h 		;f2bd	41 	A
+		db  053h 		;f2be	53 	S
+		db  044h 		;f2bf	44 	D
+		db  046h 		;f2c0	46 	F
+		db  047h 		;f2c1	47 	G
+		db  048h 		;f2c2	48 	H
+		db  036h 		;f2c3	36 	6
+		db  05fh 		;f2c4	5f 	_
+		db  031h 		;f2c5	31 	1
+		db  030h 		;f2c6	30 	0
+		db  01bh 		;f2c7	1b 	.
+		db  0ffh 		;f2c8	ff 	.
+keyscan_end:	
+		
+; BLOCK 'copyright' (start 0xf2c9 end 0xf309)
+copyright_start:	
+		db  02ah 		;f2c9	2a 	*
+		db  00dh 		;f2ca	0d 	.
+		db  034h 		;f2cb	34 	4
+		db  035h 		;f2cc	35 	5
+cpm_banner:	
+		db  036h 		;f2cd	36 	6
+		db  030h 		;f2ce	30 	0
+		db  04bh 		;f2cf	4b 	K
+		db  020h 		;f2d0	20
+		db  043h 		;f2d1	43 	C
+		db  050h 		;f2d2	50 	P
+		db  02fh 		;f2d3	2f 	/
+		db  04dh 		;f2d4	4d 	M
+		db  020h 		;f2d5	20
+		db  056h 		;f2d6	56 	V
+		db  045h 		;f2d7	45 	E
+		db  052h 		;f2d8	52 	R
+		db  053h 		;f2d9	53 	S
+		db  049h 		;f2da	49 	I
+		db  04fh 		;f2db	4f 	O
+		db  04eh 		;f2dc	4e 	N
+		db  020h 		;f2dd	20
+		db  032h 		;f2de	32 	2
+		db  02eh 		;f2df	2e 	.
+		db  032h 		;f2e0	32 	2
+		db  00ah 		;f2e1	0a 	.
+		db  00dh 		;f2e2	0d 	.
+		db  043h 		;f2e3	43 	C
+		db  04fh 		;f2e4	4f 	O
+		db  050h 		;f2e5	50 	P
+		db  059h 		;f2e6	59 	Y
+		db  052h 		;f2e7	52 	R
+		db  049h 		;f2e8	49 	I
+		db  047h 		;f2e9	47 	G
+		db  048h 		;f2ea	48 	H
+		db  054h 		;f2eb	54 	T
+		db  020h 		;f2ec	20
+		db  031h 		;f2ed	31 	1
+		db  039h 		;f2ee	39 	9
+		db  038h 		;f2ef	38 	8
+		db  034h 		;f2f0	34 	4
+		db  020h 		;f2f1	20
+		db  042h 		;f2f2	42 	B
+		db  059h 		;f2f3	59 	Y
+		db  020h 		;f2f4	20
+		db  044h 		;f2f5	44 	D
+		db  049h 		;f2f6	49 	I
+		db  047h 		;f2f7	47 	G
+		db  049h 		;f2f8	49 	I
+		db  054h 		;f2f9	54 	T
+		db  041h 		;f2fa	41 	A
+		db  04ch 		;f2fb	4c 	L
+		db  020h 		;f2fc	20
+		db  052h 		;f2fd	52 	R
+		db  045h 		;f2fe	45 	E
+		db  053h 		;f2ff	53 	S
+		db  045h 		;f300	45 	E
+		db  041h 		;f301	41 	A
+		db  052h 		;f302	52 	R
+		db  043h 		;f303	43 	C
+		db  048h 		;f304	48 	H
+		db  00dh 		;f305	0d 	.
+		db  00ah 		;f306	0a 	.
+		db  00ah 		;f307	0a 	.
+		db  000h 		;f308	00 	.
+
+if build_orignal = 1
+    db    02Ah, 0CCh, 039h, 0E5h, 021h, 0B4h, 002h, 0E5h, 021h, 098h, 02Fh, 0E5h, 0C5h, 0C9h, 0CDh, 0E9h
+    db    02Fh, 0C1h, 0E1h, 0D1h, 0CDh, 036h, 00Dh, 0C2h, 0C5h, 02Fh, 03Ah, 0D5h, 039h, 0B7h, 0C2h, 0B0h
+    db    02Fh, 078h, 0B1h, 0C2h, 0C5h, 02Fh, 0CDh, 036h, 034h, 02Ah, 0C7h, 039h, 0CDh, 050h, 02Ch, 0AFh
+    db    032h, 0D5h, 039h, 0D1h, 0D5h, 02Ah, 0CEh, 039h, 0E5h, 0EBh, 0E9h, 0D5h, 0CDh, 012h, 035h, 0B7h
+    db    0CAh, 0F8h, 02Fh, 011h
+dph0_cv:
+	db	  0C3h, 037h, 0CDh, 028h, 035h, 0CDh, 0F7h, 02Eh, 0FEh, 00Dh, 0C2h, 0D0h, 02Fh, 0E5h, 0C5h, 02Ah 
+	db	  0D0h, 039h, 0E5h, 02Ah, 0D2h, 039h, 0E5h, 02Ah, 0CEh, 039h, 0E9h, 0D1h, 0E1h, 022h, 0CEh, 039h 
+dph1_cv:
+	db	  0E1h, 022h, 0D2h, 039h, 0E1h, 022h, 0D0h, 039h, 0EBh, 0E9h, 00Bh, 062h, 06Bh, 0C3h, 09Dh, 02Fh
+	db	  03Ah, 0C9h, 039h, 0B7h, 0CAh, 0BCh, 004h, 032h, 0D5h, 039h, 0C1h, 0E1h, 0D1h, 011h, 01Bh, 030h
+dph0_av:	
+	db	  0D5h, 0E5h, 0C5h, 0AFh, 032h, 0D4h, 039h, 0C3h, 0F3h, 00Ah, 0C3h, 098h, 004h, 03Ah, 0D5h, 039h
+	db	  0B7h, 0CAh, 07Ah, 030h, 0C1h, 001h, 0CDh, 001h, 0C5h
+dph1_av:
+	db	  0CDh, 008h, 00Bh, 0FEh, 03Ah, 0CCh, 008h, 00Bh, 0CDh, 0FDh, 004h, 0C0h, 0B7h, 0F0h, 04Fh, 0E6h
+	db	  008h, 0C2h, 04Eh, 030h, 079h, 0E6h, 010h, 0C2h, 056h 
+sector_buffer:	
+    db    030h, 079h, 0E6h, 020h, 0C2h, 05Eh, 030h, 079h, 0E6h, 040h
+    db    0C2h, 06Bh, 030h, 0C9h, 03Ah, 0D4h, 039h, 03Dh, 032h, 0D4h, 039h, 0C9h, 03Ah, 0D4h, 039h, 03Ch
+    db    032h, 0D4h, 039h, 0C9h, 03Ah, 0D4h, 039h, 0B7h, 0C0h, 03Ah, 071h, 037h, 0B7h, 0C8h, 0C3h, 07Eh
+    db    025h, 03Ah, 0D4h, 039h, 0B7h, 0C0h, 023h, 07Eh, 0FEh, 008h, 0C8h, 03Eh, 0FFh, 0C3h, 0E4h, 025h
+    db    0C1h, 0D1h, 0E1h, 021h, 0B4h, 002h, 0E5h, 0D5h, 0C5h, 0C9h, 0B7h, 0F5h, 0CDh, 0B0h, 02Bh, 022h
+    db    0D6h, 039h, 0CDh, 041h, 02Eh, 04Fh, 03Ah, 076h, 038h, 0FEh, 020h, 0CAh, 09Dh, 030h, 0CDh, 050h
+    db    02Ch, 0F1h, 0C9h, 079h, 036h, 000h, 02Bh, 0FEh, 02Ch, 0C4h, 074h, 004h, 0F1h, 0F5h, 0CAh, 0D9h
+    db    030h, 0CDh, 0DCh, 00Ah, 0FEh, 03Ch, 0C4h, 074h, 004h, 0F1h, 077h, 0E5h, 0F5h, 00Eh, 000h, 02Bh
+    db    03Ah, 076h, 038h, 0FEh, 020h, 0C2h, 034h, 031h, 0F1h, 0F5h, 047h, 0CAh, 0E7h, 030h, 0CDh, 064h
+    db    02Eh, 00Ch, 0FEh, 00Dh, 0CAh, 031h, 031h, 0FEh, 03Eh, 0CAh, 034h, 031h, 0C3h, 0C8h, 030h, 0CDh
+    db    0D6h, 00Ah, 0D6h, 03Ch, 032h, 0DDh, 039h, 0CCh, 09Dh, 00Ah, 0C3h, 0B3h, 030h, 0CDh, 09Dh, 00Ah
+    db    0FEh, 00Dh, 0CAh, 02Ah, 031h, 0F5h, 03Ah, 0DDh, 039h, 0B7h, 0CAh, 00Ch, 031h, 0F1h, 011h, 034h
+    db    031h, 0D5h, 0FEh, 020h, 0C8h, 0FEh, 009h, 0C8h, 0FEh, 03Bh, 0C8h, 0FEh, 02Ch, 0C8h, 0D1h, 0C3h
+    db    024h, 031h, 0F1h, 0FEh, 03Ch, 0CAh, 020h, 031h, 0FEh, 03Eh, 0C2h, 024h, 031h, 004h, 005h, 0CAh
+    db    034h, 031h, 005h, 0C3h, 024h, 031h, 004h, 0C3h, 024h, 031h, 00Ch, 077h, 02Bh, 0C3h, 0E7h, 030h
+    db    03Ah, 0DDh, 039h, 0B7h, 0C2h, 034h, 031h, 0CDh, 0A4h, 004h, 036h, 000h, 02Bh, 0CDh, 0F2h, 02bh
+    db    078h, 0B7h, 0C4h, 074h, 004h, 0F1h
+else
+dir_buff:	
+		ds	68,0
+dph0_cv:
+		ds	32,0
+dph1_cv:
+		ds	32,0
+dph0_av:
+		ds	25,0
+dph1_av:
+		ds	25,0
+sector_buffer:	
+		ds 256, 0
+endif		
+		
+lf4bfh:					;cold boot
+		in a, (bank_a1_low) ;bank a1 = 0
+		in a, (bank_a0_high) ;bank a0 = 1
+		ld hl, 00000h
+		ld (0ea83h), hl
+		xor a
+		ld (selected_drive), a
+		ld a, 094h
+		ld (00003h), a 	;set iobyte
+		ld a, 009h
+		ld (lf1feh), a
+		in a, (caps_lock_off) ;caps lock off
+		call sub_ecd1h 	;setup display
+		ld hl, cpm_banner ;lf2cdh
+lf4dfh:	
+		ld a, (hl) 		;lf2cdh
+		or a
+		jp z, warm_start ;if cpm text not here reload
+		push hl
+		ld c, a
+		call conout
+		pop hl
+		inc hl
+		jr lf4dfh 		;loop print string till done
+lf4edh:
+		ld hl, 0d403h
+		ld (0eaf9h), hl
+		ld hl, autorun_start
+		ld de, 0d407h
+		ld bc, 0000ah
+		ldir
+		jp 0d400h 		;bdos start
+		
+; BLOCK 'autorun' (start 0xf501 end 0xf50a)
+autorun_start:	
+		db  007h 		;f501	07 	.
+		db  041h 		;f502	41 	A
+		db  055h 		;f503	55 	U
+		db  054h 		;f504	54 	T
+		db  04fh 		;f505	4f 	O
+		db  052h 		;f506	52 	R
+		db  055h 		;f507	55 	U
+		db  04eh 		;f508	4e 	N
+		db  000h 		;f509	00 	.
+autorun_end:	
+if build_orignal = 1
+    db    0C3h, 074h, 031h, 047h, 0CDh, 05Bh, 02Ch, 0FEh, 00Dh, 0CAh, 07Ch, 02Dh, 0B8h, 0CAh, 088h, 031h
+    db    0C3h, 08Fh, 031h, 0F1h, 0E1h, 022h, 0F3h, 039h, 0AFh, 0CDh, 0DBh, 034h, 0CDh, 03Eh, 035h, 0C1h
+    db    0D1h, 0E1h, 021h, 0B4h, 002h, 0E5h, 0D5h, 02Ah, 0F1h, 039h, 0E5h, 0E5h, 02Ah, 0D8h, 039h, 0E5h
+    db    02Ah, 0CCh, 039h, 0E5h, 021h, 0B4h, 002h, 0E5h, 021h, 0C9h, 031h, 0E5h, 0C5h, 0C9h, 0CDh, 0E9h
+    db    02Fh, 0C1h, 0E1h, 0D1h, 03Eh, 001h, 032h, 0DFh, 039h, 022h, 0DAh, 039h, 0E1h, 0CDh, 036h, 00Dh
+    db    0C2h, 0FAh, 031h, 03Ah, 0D5h, 039h, 0B7h, 0C2h, 0EAh, 031h, 078h, 0B1h, 0C2h, 0FAh, 031h, 02Ah
+    db    0DAh, 039h, 023h, 023h, 07Eh, 0FEh, 008h, 023h, 0D2h, 0EFh, 031h, 02Bh, 0C3h, 0B0h, 02Fh, 0EBh
+    db    0D5h, 0CDh, 012h, 035h, 0B7h, 0CAh, 021h, 032h, 011h, 0C3h, 037h, 0CDh, 012h, 035h, 0B7h, 0FCh
+    db    0B4h, 02Dh, 0CDh, 084h, 035h, 0CDh, 0F7h, 02Eh, 0FEh, 00Dh, 0C2h, 006h, 032h, 0E5h, 02Ah, 0DAh
+    db    039h, 0E5h, 0C5h, 0C3h, 0DDh, 02Fh, 00Bh, 062h, 06Bh, 0D1h, 0C3h, 0DEh, 031h, 0CDh, 07Bh, 00Bh
+    db    0FEh, 00Dh, 0CAh, 074h, 004h, 04Fh, 0CDh, 01Fh, 044h, 0CDh, 0DCh, 00Ah, 0FEh, 00Dh, 0CAh, 043h
+    db    032h, 0CDh, 01Fh, 044h, 0B9h, 0C2h, 034h, 032h, 03Eh, 00Dh, 0CDh, 01Fh, 044h, 03Eh, 00Ah, 0CDh
+    db    01Fh, 044h, 03Ah, 076h, 038h, 0FEh, 020h, 0C0h, 0C3h, 0F3h, 00Ah, 0CDh, 07Bh, 00Bh, 0FEh, 00Dh
+    db    0CAh, 074h, 004h, 032h, 0DCh, 039h, 04Fh, 0CDh, 09Dh, 00Ah, 0FEh, 00Dh, 0CAh, 071h, 032h, 0B9h
+    db    0CAh, 0F3h, 00Ah, 0C3h, 062h, 032h, 0E1h, 0D1h, 0C1h, 001h, 07Ah, 032h, 0C3h, 04Eh, 02Fh, 0C1h
+    db    001h, 050h, 02Fh, 0C5h, 021h, 0C3h, 037h, 03Ah, 0DCh, 039h, 04Fh, 07Eh, 0B9h, 0CAh, 092h, 032h
+    db    0FEh, 00Dh, 0C8h, 023h, 0C3h, 086h, 032h, 0C1h, 0D1h, 0E1h, 021h, 0B4h, 002h, 0E5h, 0D5h, 0C5h
+    db    0C9h, 0B7h, 0CDh, 07Dh, 00Dh, 0C2h, 0ADh, 032h, 0E5h, 023h, 023h, 05Eh, 023h, 056h, 0CDh, 036h
+    db    034h, 0E1h, 023h, 022h, 0C5h, 039h, 07Eh, 0F6h, 028h, 077h, 0CDh, 0B0h, 02Bh, 022h, 0D6h, 039h
+    db    00Eh, 000h, 0C5h, 0CDh, 041h, 02Eh, 0C1h, 00Ch, 0FEh, 02Ch, 0CAh, 0BDh, 032h, 0AFh, 077h, 02Bh
+    db    032h, 0DEh, 039h, 03Ch, 077h, 02Bh, 022h, 0E0h, 039h, 022h, 0E2h, 039h, 036h, 000h, 079h, 032h
+    db    0E8h, 039h, 0CDh, 0DBh, 034h, 0C1h, 0D1h, 0E1h, 021h, 0EAh, 032h, 0E5h, 0D5h, 0C5h, 0C9h, 0C1h
+    db    001h, 050h, 02Fh, 0C5h, 02Ah, 0F3h, 039h, 0E5h, 0AFh, 032h, 0DEh, 039h, 032h, 0DFh, 039h, 0CDh
+    db    00Fh, 02Fh, 0F5h, 0CDh, 00Eh, 02Ch, 0DAh, 00Fh, 033h, 0CAh, 038h, 033h, 0F1h, 032h, 0DEh, 039h
+    db    0E1h, 0C3h, 074h, 031h, 0F1h, 0CDh, 008h, 00Bh, 0C4h, 074h, 004h, 02Ah, 0E2h, 039h, 0F5h, 011h
+    db    062h, 038h, 01Ah, 03Ch, 04Fh, 01Ah, 077h, 02Bh, 013h, 00Dh, 0C2h, 020h, 033h, 036h, 000h, 022h
+    db    0E2h, 039h, 0F1h, 0FEh, 02Ch, 0CAh, 010h, 033h, 0E1h, 022h, 0F3h, 039h, 0C9h, 0F1h, 0E1h, 0AFh
+    db    022h, 0F3h, 039h, 0CDh, 0DBh
+else
+		ds	437,0		
+endif
+function_keys:	
+		dm  "DIR "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "ERA "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "TYPE "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "REN "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "SAVE "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "STAT "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "A:"
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "B:"
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "PIP"
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "ED "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "ASM "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "LOAD "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "DDT "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "DUMP "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "SUBMIT "
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm  "SETUP"
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		db          000h
+		
+		dm "00063C32111F1826AF32111F3A0F1FFE1828063C320F1F18152150F81181\r\n:1C"
+		end
